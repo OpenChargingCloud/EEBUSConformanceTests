@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           git submodule update --init --depth 1 \
-            libs/Styx libs/Hermod libs/WWCP_EEBus \
+            libs/Styx libs/Hermod libs/WWCP_EEBUS \
             libs/ship-go libs/spine-go libs/eebus-go
 
       - name: Checkout device recordings (Linux only)
@@ -41,22 +41,22 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore EEBusConformanceTests.sln
+        run: dotnet restore EEBUSConformanceTests.sln
 
       - name: Build
-        run: dotnet build EEBusConformanceTests.sln --no-restore --configuration Release
+        run: dotnet build EEBUSConformanceTests.sln --no-restore --configuration Release
 
-      # The protocol stack itself lives in the WWCP_EEBus submodule and brings its own tests.
+      # The protocol stack itself lives in the WWCP_EEBUS submodule and brings its own tests.
       # "LocalNetwork" is excluded: those tests need multicast and a free port 5353,
       # which a CI runner does not reliably provide.
-      - name: Build and test the EEBus protocol stack
-        working-directory: libs/WWCP_EEBus
+      - name: Build and test the EEBUS protocol stack
+        working-directory: libs/WWCP_EEBUS
         run: |
-          dotnet build WWCP_EEBus.sln --configuration Release
-          dotnet test  WWCP_EEBus.sln --no-build --configuration Release --filter "TestCategory!=LocalNetwork"
+          dotnet build WWCP_EEBUS.sln --configuration Release
+          dotnet test  WWCP_EEBUS.sln --no-build --configuration Release --filter "TestCategory!=LocalNetwork"
 
       - name: Test
-        run: dotnet test EEBusConformanceTests.sln --no-build --configuration Release --filter "TestCategory!=Interop"
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory!=Interop"
 
 
   interop:
@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           git submodule update --init --depth 1 \
-            libs/Styx libs/Hermod libs/WWCP_EEBus \
+            libs/Styx libs/Hermod libs/WWCP_EEBUS \
             libs/ship-go libs/spine-go libs/eebus-go libs/devices
 
       - name: Setup .NET
@@ -101,7 +101,7 @@ jobs:
           done
 
       - name: Build
-        run: dotnet build EEBusConformanceTests.sln --configuration Release
+        run: dotnet build EEBUSConformanceTests.sln --configuration Release
 
       - name: Interoperability tests
-        run: dotnet test EEBusConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop"
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop"

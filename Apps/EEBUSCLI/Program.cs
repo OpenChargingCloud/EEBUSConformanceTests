@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
- * This file is part of EEBusConformanceTests <https://github.com/OpenChargingCloud/EEBusConformanceTests>
+ * This file is part of EEBUSConformanceTests <https://github.com/OpenChargingCloud/EEBUSConformanceTests>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,16 @@
 
 #region Usings
 
-using SHIP  = cloud.charging.open.protocols.EEBus.SHIP;
-using SPINE = cloud.charging.open.protocols.EEBus.SPINE;
+using SHIP  = cloud.charging.open.protocols.EEBUS.SHIP;
+using SPINE = cloud.charging.open.protocols.EEBUS.SPINE;
 
 #endregion
 
-namespace cloud.charging.open.protocols.EEBus.CLI
+namespace cloud.charging.open.protocols.EEBUS.CLI
 {
 
     /// <summary>
-    /// Command line runner for the EEBus simulations and conformance test runs.
+    /// Command line runner for the EEBUS simulations and conformance test runs.
     ///
     /// The subcommands are implemented along with their work packages
     /// (simulations: WP10, conformance runs: WP11); for now the tool reports
@@ -71,7 +71,7 @@ namespace cloud.charging.open.protocols.EEBus.CLI
         private static void PrintVersion()
         {
 
-            Console.WriteLine("EEBus conformance test suite");
+            Console.WriteLine("EEBUS conformance test suite");
             Console.WriteLine();
             Console.WriteLine($"  SHIP   {SHIP. Version.String}  (protocolId '{SHIP.Version.ProtocolId}', handshake {SHIP.Version.Major}.{SHIP.Version.Minor})");
             Console.WriteLine($"  SPINE  {SPINE.Version.String}  ({SPINE.Version.XMLNamespace})");
@@ -89,7 +89,7 @@ namespace cloud.charging.open.protocols.EEBus.CLI
             Console.WriteLine("Usage: eebus <command>");
             Console.WriteLine();
             Console.WriteLine("Commands:");
-            Console.WriteLine("  version    Show the implemented EEBus protocol versions");
+            Console.WriteLine("  version    Show the implemented EEBUS protocol versions");
             Console.WriteLine("  help       Show this help");
             Console.WriteLine();
             Console.WriteLine("Planned:");

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
- * This file is part of EEBusConformanceTests <https://github.com/OpenChargingCloud/EEBusConformanceTests>
+ * This file is part of EEBUSConformanceTests <https://github.com/OpenChargingCloud/EEBUSConformanceTests>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ using System.Diagnostics;
 
 #endregion
 
-namespace cloud.charging.open.protocols.EEBus.Interop.tests
+namespace cloud.charging.open.protocols.EEBUS.Interop.tests
 {
 
     /// <summary>

@@ -1,5 +1,5 @@
 <!--
-  Common build settings for all EEBusConformanceTests projects.
+  Common build settings for all EEBUSConformanceTests projects.
 
   Note: submodules under "libs/" are shielded from this file by libs/Directory.Build.props.
 -->
@@ -23,7 +23,7 @@
     <Authors>GraphDefined GmbH</Authors>
     <Copyright>Copyright © 2014-2026 GraphDefined GmbH</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/OpenChargingCloud/EEBusConformanceTests</RepositoryUrl>
+    <RepositoryUrl>https://github.com/OpenChargingCloud/EEBUSConformanceTests</RepositoryUrl>
 
   </PropertyGroup>
 

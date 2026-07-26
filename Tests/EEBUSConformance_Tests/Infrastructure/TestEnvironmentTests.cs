@@ -1,6 +1,6 @@
 ﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
- * This file is part of EEBusConformanceTests <https://github.com/OpenChargingCloud/EEBusConformanceTests>
+ * This file is part of EEBUSConformanceTests <https://github.com/OpenChargingCloud/EEBUSConformanceTests>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ using NUnit.Framework;
 
 #endregion
 
-namespace cloud.charging.open.protocols.EEBus.Conformance.tests
+namespace cloud.charging.open.protocols.EEBUS.Conformance.tests
 {
 
     /// <summary>
@@ -57,7 +57,7 @@ namespace cloud.charging.open.protocols.EEBus.Conformance.tests
             Assert.Multiple(() => {
                 Assert.That(TestEnvironment.RequireSubmodule(TestEnvironment.ShipGo). Exists,  Is.True);
                 Assert.That(TestEnvironment.RequireSubmodule(TestEnvironment.SpineGo).Exists,  Is.True);
-                Assert.That(TestEnvironment.RequireSubmodule(TestEnvironment.EEBusGo).Exists,  Is.True);
+                Assert.That(TestEnvironment.RequireSubmodule(TestEnvironment.EEBUSGo).Exists,  Is.True);
             });
 
         }

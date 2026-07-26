@@ -1,7 +1,7 @@
-# EEBus in C# / .NET 10 — Work Plan
+# EEBUS in C# / .NET 10 — Work Plan
 
-**Repository:** `OpenChargingCloud/EEBusConformanceTests`
-**Status:** 2026-07-26 (after analysing ship-go, spine-go, eebus-go, Hermod, Styx, WWCP_EEBus
+**Repository:** `OpenChargingCloud/EEBUSConformanceTests`
+**Status:** 2026-07-26 (after analysing ship-go, spine-go, eebus-go, Hermod, Styx, WWCP_EEBUS
 and the official specifications in `docs/specs/`)
 **Audience:** Autonomous coding agents (Opus 5 / Sonnet 5 et al.) working through the work packages.
 
@@ -9,7 +9,7 @@ and the official specifications in `docs/specs/`)
 
 ## 0. Mission and scope
 
-Build a complete **EEBus protocol stack in C# (.NET 10)** — SHIP client/server and SPINE
+Build a complete **EEBUS protocol stack in C# (.NET 10)** — SHIP client/server and SPINE
 client/server — plus a **use case layer**, **example simulations for e-mobility**
 (LPC, MPC, OPEV, …) and a **conformance and interoperability test suite** (NUnit) which tests
 both our own stack and other implementations (ship-go, spine-go, eebus-go, EVCC, EEBUS.Net, …).
@@ -18,19 +18,19 @@ both our own stack and other implementations (ship-go, spine-go, eebus-go, EVCC,
 
 | Repository | Role |
 |---|---|
-| [`OpenChargingCloud/WWCP_EEBus`](https://github.com/OpenChargingCloud/WWCP_EEBus) (submodule `libs/WWCP_EEBus`) | **The stack.** `WWCP_EEBus_SHIP`, `WWCP_EEBus_SPINE`, `WWCP_EEBus_UseCases` (and their unit tests) are built here. The existing code is refactored (→ WP-W0). All "production" work packages (WP01–WP09) deliver into this repository. |
-| `OpenChargingCloud/EEBusConformanceTests` (this repository) | **The test bench.** Conformance catalog (WP11), interoperability harness (WP12), simulations (WP10), device replay, reference submodules, specifications. It primarily tests WWCP_EEBus, but can test any EEBus device. |
+| [`OpenChargingCloud/WWCP_EEBUS`](https://github.com/OpenChargingCloud/WWCP_EEBUS) (submodule `libs/WWCP_EEBUS`) | **The stack.** `WWCP_EEBUS_SHIP`, `WWCP_EEBUS_SPINE`, `WWCP_EEBUS_UseCases` (and their unit tests) are built here. The existing code is refactored (→ WP-W0). All "production" work packages (WP01–WP09) deliver into this repository. |
+| `OpenChargingCloud/EEBUSConformanceTests` (this repository) | **The test bench.** Conformance catalog (WP11), interoperability harness (WP12), simulations (WP10), device replay, reference submodules, specifications. It primarily tests WWCP_EEBUS, but can test any EEBUS device. |
 
-Changes to `libs/WWCP_EEBus` are committed and pushed within the submodule (after Achim's
+Changes to `libs/WWCP_EEBUS` are committed and pushed within the submodule (after Achim's
 approval); afterwards the submodule pointer is updated here.
 
 ### Status (2026-07-26)
 
 | WP | Status |
 |---|---|
-| **WP-W0** | ✅ done — `WWCP_EEBus` builds standalone (Styx + Hermod only), `dotnet test` green (13 tests) |
-| **WP00** | ✅ done — `EEBusConformanceTests.sln`, CLI, conformance and interoperability test projects, GitHub Actions CI; `dotnet test` green (5 tests + 2 interoperability tests reporting "inconclusive" without Go) |
-| **WP01** | ✅ done — complete SHIP message set (including init/CMI, the PIN family, `accessMethodsRequest`), **EEBusJSON** verified against the golden vectors of ship-go, `SHIPFrame` framing, `SHIPMessageExchangeStates` (0–39) |
+| **WP-W0** | ✅ done — `WWCP_EEBUS` builds standalone (Styx + Hermod only), `dotnet test` green (13 tests) |
+| **WP00** | ✅ done — `EEBUSConformanceTests.sln`, CLI, conformance and interoperability test projects, GitHub Actions CI; `dotnet test` green (5 tests + 2 interoperability tests reporting "inconclusive" without Go) |
+| **WP01** | ✅ done — complete SHIP message set (including init/CMI, the PIN family, `accessMethodsRequest`), **EEBUSJSON** verified against the golden vectors of ship-go, `SHIPFrame` framing, `SHIPMessageExchangeStates` (0–39) |
 | **WP02** | ✅ done — `SKI` value type, ECDSA P-256 certificates with subject key identifier, SHA-256 fingerprint, SHIP TLS profile; a real TLS handshake with mutual authentication in the tests; ADR `docs/adr/0001-tls-cipher-suites.md` |
 | **WP03** | ✅ done — `SHIPServiceTXT` (SHIP 7.3.2 including `serial`/`cat`, manufacturer keys survive parsing), `SHIPServiceInstance`, `ISHIPDiscovery` with two implementations: **`SHIPMDNSDiscovery`** (real multicast DNS: responder, browser, goodbye with TTL 0) and `InMemorySHIPDiscovery` for environments without multicast. **Own DNS-SD wire encoding** (`SHIPMDNSMessage`), because Hermod's `TXT` carries only *one* string while DNS-SD requires one character string per key/value pair (RFC 6763 §6.1) — including name compression when reading. Live test over real multicast green. |
 | **WP04** | ✅ done — `SHIPConnection` with all phases (CMI, hello including prolongation, protocol handshake, PIN, access methods, data, close); **every timer runs on a TimeProvider**, tests use `FakeTimeProvider` without a single real wait |
@@ -99,11 +99,11 @@ Guiding principles:
 | `libs/eebus-go` | Use case layer + service (Go, enbility) | `service/` (assembly of SHIP + SPINE), `api/configuration.go`, `usecases/` (`cs/lpc`, `cs/lpp`, `eg/lpc`, `eg/lpp`, `cem/opev`, `cem/oscev`, `cem/evcc`, `cem/evcem`, `cem/evsecc`, `cem/evsoc`, `cem/cevc`, `cem/ohpcf`, `cem/vabd`, `cem/vapd`, `ma/mpc`, `ma/mgcp`, `ma/mdt`, `mu/mpc`, `gcp/mgcp`, `usecase/usecase.go` = UseCaseBase), `features/` (client and server feature helpers), `examples/` (`hems`, `evse`, `controlbox`, `ced`, `heatpump`, `remote`) |
 | `libs/devices` | **Recorded answers of real devices** (MIT): `NodeManagementDetailedDiscoveryData` + `NodeManagementUseCaseData` of series devices (Elli, EVCC, Kostal, Porsche PMCC, SMA, Spelsberg, Vaillant, Viessmann) | per device `device.json`, `discovery-data.json`, `usecase-data.json`; `schema/` (JSON schemas), `devices.json`/`usecases.json` (aggregates). **Windows note:** `vaillant/arotherm-vwl-75:6a/` contains a colon → cannot be checked out; the content is readable via `git -C libs/devices show "HEAD:vaillant/arotherm-vwl-75:6a/discovery-data.json"` (which is why the submodule is set to `ignore = dirty`) |
 | `libs/devices-app` | GUI test tool (Go + Vue 3, MIT): pairing through a web UI, shows the SPINE data, use cases and features of the communication partner | `main.go` (HTTP :7050, EEBUS :4815, automatic certificates); an ideal **manual peer** for our server |
-| `libs/WWCP_EEBus` | **Target repository of the stack** (C#, Apache-2.0, net10.0), namespace `cloud.charging.open.protocols.EEBus.SHIP/.SPINE` | `WWCP_EEBus_SHIP/` (SHIP messages as TryParse/ToJSON types, `PredefinedStrings/`, OCPP-like `EEBusAdapter/`, `WebSocket/SHIPWebSocketClient/-Server.cs`, `AEEBusNode.cs`), `WWCP_EEBus_SPINE/` (only `Version.cs` — empty), both `*_Tests/` are placeholders. **Note:** the csproj expects `WWCP_Core` siblings (→ WP-W0) |
+| `libs/WWCP_EEBUS` | **Target repository of the stack** (C#, Apache-2.0, net10.0), namespace `cloud.charging.open.protocols.EEBUS.SHIP/.SPINE` | `WWCP_EEBUS_SHIP/` (SHIP messages as TryParse/ToJSON types, `PredefinedStrings/`, OCPP-like `EEBUSAdapter/`, `WebSocket/SHIPWebSocketClient/-Server.cs`, `AEEBUSNode.cs`), `WWCP_EEBUS_SPINE/` (only `Version.cs` — empty), both `*_Tests/` are placeholders. **Note:** the csproj expects `WWCP_Core` siblings (→ WP-W0) |
 
 ### 1.2 Specifications — **available locally below `docs/specs/`!**
 
-> `docs/specs/` is working material (EEBus download license) and is **not committed**
+> `docs/specs/` is working material (EEBUS download license) and is **not committed**
 > (`.gitignore`). Every agent working here can and should look into it directly.
 
 Structure: five category folders (`E-Mobility/`, `Grid/`, `HVAC/`, `Inverter/`, `SHIP SPINE/`),
@@ -113,7 +113,7 @@ next to the archive; extract again after a fresh checkout).
 
 | Path (below `docs/specs/`) | Content |
 |---|---|
-| `SHIP SPINE/Technical Specifications/EEBus_SHIP_TS_Specification_v1.0.1-1/EEBus_SHIP_TS_Specification_v1.0.1/` | **SHIP TS 1.0.1** (96 pages, PDF + `EEBus_SHIP_TS_TransferProtocol.xsd`). Chapters: 5 registration, 6 reconnection, 7 discovery (7.3 mDNS/TXT), 8 TCP, 9 TLS (9.1 cipher suites, **9.2 maximum fragment length**), 10 WebSocket (10.2 sub protocol), **11 JSON format (11.4/11.5 = the normative EEBus JSON rules)**, 12 key management (12.2 SKI, 12.5 PIN, 12.6 QR code), 13 data exchange (13.4 the SME state machines), 14 well-known `protocolId`. **The interoperability target version.** |
+| `SHIP SPINE/Technical Specifications/EEBus_SHIP_TS_Specification_v1.0.1-1/EEBus_SHIP_TS_Specification_v1.0.1/` | **SHIP TS 1.0.1** (96 pages, PDF + `EEBus_SHIP_TS_TransferProtocol.xsd`). Chapters: 5 registration, 6 reconnection, 7 discovery (7.3 mDNS/TXT), 8 TCP, 9 TLS (9.1 cipher suites, **9.2 maximum fragment length**), 10 WebSocket (10.2 sub protocol), **11 JSON format (11.4/11.5 = the normative EEBUS JSON rules)**, 12 key management (12.2 SKI, 12.5 PIN, 12.6 QR code), 13 data exchange (13.4 the SME state machines), 14 well-known `protocolId`. **The interoperability target version.** |
 | `SHIP SPINE/Technical Specifications/EEBus_SHIP_TS_Specification_v1.1.0_public/EEBus_SHIP_TS_Specification_v1.1.0_public/` | **SHIP TS 1.1.0** (122 pages, PDF + XSD). Same chapter structure, new among others: 7.4 re-discovery recommendations, 9.7 TLS ECC extension, **9.8 TLS probing**, 12.6 SHIP commissioning tool, 6.1 key changes. Delta review task in WP01/WP04; the implementation target remains 1.0.1 |
 | `SHIP SPINE/Technical Specifications/EEBus_SPINE_V1.3.0/EEBus_SPINE_V1.3.0_Final_hp/` | **SPINE 1.3.0 FINAL**: `Documentation/` (introduction, protocol specification, resource specification), `XSDs/` (**76 XSDs — the primary source for the model generation in WP06**, namespace `http://docs.eebus.org/spine/xsd/v1`), `ExampleXMLs/RestrictedFunctionExchange/` (30 official partial update datagrams → fixtures for WP06/07) |
 | `SHIP SPINE/Technical Specifications/EEBUS_TS_ShipRequirementsForInstallationProcess_V1.1.0.pdf` + `EEBus_SHIP_Pairing_Service_TS_Specification_V1.0.0.pdf` | Installation process **v1.1.0** + **SHIP pairing service** — the basis of WP14 |
@@ -140,17 +140,17 @@ Conflict rule: where a PDF or XSD contradicts the Go reference, the Go behaviour
 **conformance tests** — such cases are documented as findings in `docs/spec-deviations.md`
 (modelled after `libs/ship-go/docs/SPEC_COMPLIANCE.md`).
 
-### 1.3 The EEBus ecosystem (research result, as of July 2026)
+### 1.3 The EEBUS ecosystem (research result, as of July 2026)
 
 | Project | Language | Scope | Value for us |
 |---|---|---|---|
 | [enbility/ship-go](https://github.com/enbility/ship-go) + [spine-go](https://github.com/enbility/spine-go) + [eebus-go](https://github.com/enbility/eebus-go) | Go | complete, in production (EVCC) | reference + primary interoperability peer |
-| [evcc-io/evcc](https://github.com/evcc-io/evcc) | Go | HEMS product using eebus-go; §14a EnWG via LPC/MPC, EEBus wallboxes (among others Porsche PMCC, Elli) | a realistic end-to-end interoperability peer |
+| [evcc-io/evcc](https://github.com/evcc-io/evcc) | Go | HEMS product using eebus-go; §14a EnWG via LPC/MPC, EEBUS wallboxes (among others Porsche PMCC, Elli) | a realistic end-to-end interoperability peer |
 | [digitaltwinconsortium/EEBUS.Net](https://github.com/digitaltwinconsortium/EEBUS.Net) | C#/.NET 6 | SHIP complete, SPINE started; MIT | a second independent SHIP peer; a source of ideas for C# idioms (but ASP.NET based, a different architecture) |
 | [NIBEGroup/openeebus](https://github.com/NIBEGroup/openeebus) | C | SHIP + SPINE (heat pump manufacturer) | an optional third interoperability peer |
 | [LMF-DHBW/go_eebus](https://github.com/LMF-DHBW/go_eebus) | Go | an older framework | historical only |
 | [openmuc/jeebus.spine](https://github.com/openmuc/jeebus.spine), [arasgungore/EEBUS-in-Java](https://github.com/arasgungore/EEBUS-in-Java) | Java | SPINE respectively SHIP + SPINE, older | comparison material |
-| [OpenChargingCloud/WWCP_EEBus](https://github.com/OpenChargingCloud/WWCP_EEBus) | C# | an early skeleton (SHIP messages, an OCPP-like adapter; SPINE empty) | **the target repository of the stack** (§ 0 two repository model, WP-W0 refactoring); included as `libs/WWCP_EEBus` |
+| [OpenChargingCloud/WWCP_EEBUS](https://github.com/OpenChargingCloud/WWCP_EEBUS) | C# | an early skeleton (SHIP messages, an OCPP-like adapter; SPINE empty) | **the target repository of the stack** (§ 0 two repository model, WP-W0 refactoring); included as `libs/WWCP_EEBUS` |
 | KEO Connectivity, [EEBUS Tester](https://eebustester.com/) | commercial | certified stack / the official test tool | the certification target; mind the KEO peculiarities (see risks) |
 
 ---
@@ -176,7 +176,7 @@ JSON (UTF-8)**:
 
 ship-go limits incoming messages to 100 KiB (`ws/types.go`) — a sensible hardening, adopted.
 
-**"EEBus JSON"** (normative: SHIP TS **chapter 11**, "Message Representation Using JSON Text
+**"EEBUS JSON"** (normative: SHIP TS **chapter 11**, "Message Representation Using JSON Text
 Format", 11.4/11.5 XML↔JSON transformation): every JSON object is encoded on the wire as an
 **ordered array of single property objects** (an inheritance from XML; the order is
 significant!):
@@ -184,12 +184,12 @@ significant!):
 ```json
 // ordinary JSON:
 {"messageProtocolHandshake":{"handshakeType":"announceMax","version":{"major":1,"minor":0},"formats":{"format":["JSON-UTF8"]}}}
-// EEBus JSON (as it goes on the wire, after the type byte):
+// EEBUS JSON (as it goes on the wire, after the type byte):
 [{"messageProtocolHandshake":[{"handshakeType":"announceMax"},{"version":[{"major":1},{"minor":0}]},{"formats":[{"format":["JSON-UTF8"]}]}]}]
 ```
 
 ship-go implements the reverse transformation naively with string replacements
-(`ship/helper.go`) — **we build it structurally** (JObject ↔ EEBus form, order preserving,
+(`ship/helper.go`) — **we build it structurally** (JObject ↔ EEBUS form, order preserving,
 with the special case `[]`→`{}`) and tolerantly (known device quirks: the PMCC appends `0x00`
 bytes; see `JsonFromEEBUSJson`).
 
@@ -288,7 +288,7 @@ The feature types (33) and entity types (including `EV`, `EVSE`, `CEM`, `GridGua
 
 **Golden files:** `libs/spine-go/spine/testdata/*.json` (node management discovery,
 subscriptions, destination list) and `libs/spine-go/integration_tests/testdata/*.json`
-(electrical connection, measurement, partial notifies) — in ordinary JSON; the EEBus JSON
+(electrical connection, measurement, partial notifies) — in ordinary JSON; the EEBUS JSON
 transformation happens on the SHIP level only. These files are used one to one as fixtures of
 our serialisation tests.
 **In addition `libs/devices`:** real `discovery-data.json`/`usecase-data.json` files of series
@@ -332,32 +332,32 @@ everywhere), **TimeSeries + IncentiveTable** (CEVC), **Identification** (EVCC).
 
 ### 3.1 Projects and namespaces (the two repository model)
 
-**Stack → `libs/WWCP_EEBus`** (commit there; namespaces as they already are,
-`cloud.charging.open.protocols.EEBus.SHIP` / `.SPINE`, newly `.UseCases`):
+**Stack → `libs/WWCP_EEBUS`** (commit there; namespaces as they already are,
+`cloud.charging.open.protocols.EEBUS.SHIP` / `.SPINE`, newly `.UseCases`):
 
 ```
-WWCP_EEBus/
-├── WWCP_EEBus_SHIP/               # SHIP: messages, EEBusJSON, state machines, mDNS, PKI, SHIPNode
-├── WWCP_EEBus_SHIP_Tests/         # NUnit (placeholders today → WP01/02/03/04/05)
-├── WWCP_EEBus_SPINE/              # SPINE: model (XSD generated), core, node management
-├── WWCP_EEBus_SPINE_Tests/        # NUnit (+ golden files from spine-go and the example XMLs)
-├── WWCP_EEBus_UseCases/           # NEW: UseCaseBase + LPC/LPP/MPC/MGCP/OPEV/… (+ _Tests)
-├── WWCP_EEBus_Adapter/            # NEW (later): the bridge to WWCP_Core/OverlayNetworking
-└── WWCP_EEBus.sln
+WWCP_EEBUS/
+├── WWCP_EEBUS_SHIP/               # SHIP: messages, EEBUSJSON, state machines, mDNS, PKI, SHIPNode
+├── WWCP_EEBUS_SHIP_Tests/         # NUnit (placeholders today → WP01/02/03/04/05)
+├── WWCP_EEBUS_SPINE/              # SPINE: model (XSD generated), core, node management
+├── WWCP_EEBUS_SPINE_Tests/        # NUnit (+ golden files from spine-go and the example XMLs)
+├── WWCP_EEBUS_UseCases/           # NEW: UseCaseBase + LPC/LPP/MPC/MGCP/OPEV/… (+ _Tests)
+├── WWCP_EEBUS_Adapter/            # NEW (later): the bridge to WWCP_Core/OverlayNetworking
+└── WWCP_EEBUS.sln
 ```
 
 **Test bench → this repository** (references the stack projects through the submodule path):
 
 ```
-EEBusConformanceTests/
-├── libs/                          # submodules (including WWCP_EEBus!)
-├── EEBusSimulations/              # the simulation library (§ 5)
-├── Apps/EEBusCLI/                 # the console runner (sim …, conformance …; Styx.CLI)
+EEBUSConformanceTests/
+├── libs/                          # submodules (including WWCP_EEBUS!)
+├── EEBUSSimulations/              # the simulation library (§ 5)
+├── Apps/EEBUSCLI/                 # the console runner (sim …, conformance …; Styx.CLI)
 ├── Tests/
-│   ├── EEBusConformance_Tests/    # the conformance catalog (against a configurable target device)
-│   └── EEBusInterop_Tests/        # orchestrates Go and .NET peers as processes
+│   ├── EEBUSConformance_Tests/    # the conformance catalog (against a configurable target device)
+│   └── EEBUSInterop_Tests/        # orchestrates Go and .NET peers as processes
 ├── docs/                          # specs/ (not committed), notes, ADRs, reports/
-├── EEBusConformanceTests.sln
+├── EEBUSConformanceTests.sln
 ├── WORKPLAN.md
 └── redo.sh
 ```
@@ -369,25 +369,25 @@ EEBusConformanceTests/
 * Tests: `NUnit` 4.6+, `NUnit3TestAdapter`, `Microsoft.NET.Test.Sdk`,
   `Microsoft.Extensions.TimeProvider.Testing` (FakeTimeProvider).
 * **License (decided 2026-07-26):** Apache-2.0, the file header template is
-  `libs/WWCP_EEBus/WWCP_EEBus_SHIP/Messages/ASHIPMessage.cs`
-  ("Copyright (c) 2014-… GraphDefined GmbH … This file is part of WWCP EEBus").
+  `libs/WWCP_EEBUS/WWCP_EEBUS_SHIP/Messages/ASHIPMessage.cs`
+  ("Copyright (c) 2014-… GraphDefined GmbH … This file is part of WWCP EEBUS").
   New files in this repository use the same header (with the project name adjusted).
 
 ### 3.2 Layers and core abstractions
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ Simulations / EEBusCLI / conformance tests                     │
+│ Simulations / EEBUSCLI / conformance tests                     │
 ├────────────────────────────────────────────────────────────────┤
-│ EEBus.UseCases   UseCaseBase, LPC/LPP/MPC/MGCP/OPEV/OSCEV/…    │
+│ EEBUS.UseCases   UseCaseBase, LPC/LPP/MPC/MGCP/OPEV/OSCEV/…    │
 │                  + reusable feature helpers                    │
 ├────────────────────────────────────────────────────────────────┤
-│ EEBus.SPINE      SPINEDevice (local/remote), entity, feature,  │
+│ EEBUS.SPINE      SPINEDevice (local/remote), entity, feature,  │
 │                  node management, subscription/binding/        │
 │                  heartbeat managers, sender, data model        │
 ├────────────────────────────────────────────────────────────────┤
-│ EEBus.SHIP       SHIPNode (hub), SHIPConnection (state machine),│
-│                  EEBusJSON, mDNS discovery and announcement,    │
+│ EEBUS.SHIP       SHIPNode (hub), SHIPConnection (state machine),│
+│                  EEBUSJSON, mDNS discovery and announcement,    │
 │                  certificates/SKI, trust store/pairing         │
 ├────────────────────────────────────────────────────────────────┤
 │ Hermod           WebSocketClient/AWebSocketServer, DNS, TLS    │
@@ -413,13 +413,13 @@ Important interfaces (mirroring the ship-go and spine-go APIs, adapted to C# idi
 ### 3.3 JSON strategy
 
 * **Newtonsoft.Json** (the house standard of Hermod; `JObject`/`JProperty` preserve the
-  insertion order — a precondition for EEBus JSON).
+  insertion order — a precondition for EEBUS JSON).
 * SPINE model: C# classes with `JsonProperty(..., NullValueHandling.Ignore)` attributes (field
   names exactly like the Go `json:` tags), plus a few custom converters: ISO 8601 durations
   (`DurationType` ↔ `TimeSpan`), `AbsoluteOrRelativeTimeType`, hex binary, and the numeric
   `ScaledNumberType`.
-* The **EEBusJSON** class within `EEBus.SHIP`: a structural, lossless conversion between
-  ordinary JSON and the EEBus array form (recursive; the `{}`↔`[]` special case; trimming
+* The **EEBUSJSON** class within `EEBUS.SHIP`: a structural, lossless conversion between
+  ordinary JSON and the EEBUS array form (recursive; the `{}`↔`[]` special case; trimming
   `0x00` bytes when reading). Property based tests: a roundtrip over all golden files.
 * The public envelope types (SHIP messages, the SPINE datagram) additionally follow the
   GraphDefined style with `TryParse(JObject, out T, out String? errorResponse)` / `ToJSON()`.
@@ -431,59 +431,59 @@ Important interfaces (mirroring the ship-go and spine-go APIs, adapted to C# idi
 > Effort: S (<= half a day for an agent), M (~1 day), L (several days), XL (more than a week,
 > or to be split). Every work package ends with: green tests (`dotnet test`), no warnings, a
 > short piece of documentation in `docs/`.
-> **WP01–WP09 deliver into `libs/WWCP_EEBus`** (submodule commits, pushed after approval),
+> **WP01–WP09 deliver into `libs/WWCP_EEBUS`** (submodule commits, pushed after approval),
 > WP00 and WP10–WP13 into this repository.
 
-### WP-W0 — refactoring WWCP_EEBus *(M; first, together with WP00)* ✅ **done**
+### WP-W0 — refactoring WWCP_EEBUS *(M; first, together with WP00)* ✅ **done**
 
 > **Result:** the branch `wp-w0-refactoring` within the submodule, everything staged (the
-> commit is waiting for Achim's GPG signature). `dotnet build WWCP_EEBus.sln` is green without
+> commit is waiting for Achim's GPG signature). `dotnet build WWCP_EEBUS.sln` is green without
 > warnings in our own sources, `dotnet test` is green: 11 SHIP + 1 SPINE + 1 use case test.
 > Implemented in addition to the table below: `generated.cs` deleted (it carried a wrong AGPL
 > header from WWCP_ChargingStation; the PIN types it contained arrive properly in WP01), the
 > `Version` classes decoupled (before, SHIP and SPINE declared the **same** class
-> `EEBus.Version` → a conflict as soon as both are referenced), and two nullability analysis
+> `EEBUS.Version` → a conflict as soon as both are referenced), and two nullability analysis
 > errors after removing CustomData fixed.
 
-An inventory of `libs/WWCP_EEBus` (2026-07-26) and the refactoring tasks:
+An inventory of `libs/WWCP_EEBUS` (2026-07-26) and the refactoring tasks:
 
 | Existing code | Assessment → action |
 |---|---|
-| `WWCP_EEBus_SHIP/DataStructures/` (Complex, Enums, `PredefinedStrings/` such as `SHIP_Id`, `ConnectionHelloPhase`) | **Keep and extend** — the PredefinedStrings style (extensible string types instead of C# enums) matches the XSD pattern `EnumExtendType` exactly (§ WP06). Add the missing types: `ConnectionPinState/-Input/-Error`, `AccessMethodsRequest`, the waiting/prolongation fields per WP01 |
+| `WWCP_EEBUS_SHIP/DataStructures/` (Complex, Enums, `PredefinedStrings/` such as `SHIP_Id`, `ConnectionHelloPhase`) | **Keep and extend** — the PredefinedStrings style (extensible string types instead of C# enums) matches the XSD pattern `EnumExtendType` exactly (§ WP06). Add the missing types: `ConnectionPinState/-Input/-Error`, `AccessMethodsRequest`, the waiting/prolongation fields per WP01 |
 | `Messages/ASHIPMessage.cs` + the control/data/close messages | **Keep, but:** remove `CustomData` — an OCPP concept; SHIP messages have a fixed schema (only `ShipData` has an `extension`), and wire fidelity is mandatory for conformance. Keep the TryParse/ToJSON pattern |
-| `EEBusAdapter/` (IN/OUT/FORWARD), `AEEBusNode.cs`, `IEEBusNetworkingNode.cs` | **Move out** into `WWCP_EEBus_Adapter/` (a new project, for now not part of the solution): it depends on `WWCP_Core`/`WWCP_OverlayNetworking`, which are not available here. To be revived once the core stands |
+| `EEBUSAdapter/` (IN/OUT/FORWARD), `AEEBUSNode.cs`, `IEEBUSNetworkingNode.cs` | **Move out** into `WWCP_EEBUS_Adapter/` (a new project, for now not part of the solution): it depends on `WWCP_Core`/`WWCP_OverlayNetworking`, which are not available here. To be revived once the core stands |
 | `IOCPPWebSocketAdapterIN/OUT/FORWARD.cs`, `generated.cs` | **Delete** (leftovers copied from OCPP), or inspect and delete |
 | `WebSocket/SHIPWebSocketClient/-Server.cs` | **Rebuild** on a plain Hermod foundation (sub protocol `ship`, TLS and client certificates from WP02); the state machine is attached in WP04/05 |
-| `WWCP_EEBus_SHIP.csproj` | **Remove** the `WWCP_Core` and `WWCP_OverlayNetworking` references; Styx and Hermod only (the paths `..\..\Styx\…`, `..\..\Hermod\…` already work within the `libs/WWCP_EEBus` layout) |
-| `WWCP_EEBus_SPINE/` (empty), `*_Tests/` (the placeholder `Class1.cs`) | Set up the projects per § 3.1 (NUnit packages, first smoke tests); **create** `WWCP_EEBus_UseCases(+_Tests)`; create `WWCP_EEBus.sln` |
+| `WWCP_EEBUS_SHIP.csproj` | **Remove** the `WWCP_Core` and `WWCP_OverlayNetworking` references; Styx and Hermod only (the paths `..\..\Styx\…`, `..\..\Hermod\…` already work within the `libs/WWCP_EEBUS` layout) |
+| `WWCP_EEBUS_SPINE/` (empty), `*_Tests/` (the placeholder `Class1.cs`) | Set up the projects per § 3.1 (NUnit packages, first smoke tests); **create** `WWCP_EEBUS_UseCases(+_Tests)`; create `WWCP_EEBUS.sln` |
 
 * **Architectural decision (default A, to be confirmed by Achim):**
   (A) the SHIP/SPINE/UseCases core **standalone** (Styx and Hermod only), with the WWCP
   integration as a separate adapter project later ↔ (B) keep the OverlayNetworking foundation
   and carry `WWCP_Core` along as another submodule. The plan assumes **A**.
-* **Acceptance:** `dotnet build WWCP_EEBus.sln` green **inside this repository** (with only
+* **Acceptance:** `dotnet build WWCP_EEBUS.sln` green **inside this repository** (with only
   `libs/Styx` and `libs/Hermod` as neighbours); both test projects run; the commit within the
   submodule is prepared and pushed after Achim's approval.
 
 ### WP00 — the test bench skeleton and CI *(S; in parallel with WP-W0)* ✅ **done**
 
-> **Result:** `EEBusConformanceTests.sln` with `EEBusSimulations`, `Apps/EEBusCLI`,
-> `Tests/EEBusConformance_Tests`, `Tests/EEBusInterop_Tests`; `dotnet run --project
-> Apps/EEBusCLI -- version` reports SHIP 1.0.1 / SPINE 1.3.0 through the complete reference
+> **Result:** `EEBUSConformanceTests.sln` with `EEBUSSimulations`, `Apps/EEBUSCLI`,
+> `Tests/EEBUSConformance_Tests`, `Tests/EEBUSInterop_Tests`; `dotnet run --project
+> Apps/EEBUSCLI -- version` reports SHIP 1.0.1 / SPINE 1.3.0 through the complete reference
 > chain. Infrastructure already usable: `TestEnvironment` (finds the repository root, the
 > specifications, `libs/devices`, the spine-go golden files; **`Assert.Inconclusive` instead of
 > a failure** when licensed specifications or submodules are missing) and `GoToolchain`
 > (likewise without Go).
 > **An important trick:** `libs/Directory.Build.props` (empty) stops the MSBuild search, so
 > that `TreatWarningsAsErrors` from the root `Directory.Build.props` does **not** reach the
-> submodules (Hermod/Styx/WWCP_EEBus) — otherwise the build fails on Hermod's warnings.
+> submodules (Hermod/Styx/WWCP_EEBUS) — otherwise the build fails on Hermod's warnings.
 > The CI (`.github/workflows/build-and-test.yml`) initialises the submodules **individually**
 > instead of using `submodules: recursive`, because `libs/devices` cannot be checked out on
 > Windows (§ 9).
 
-* `EEBusConformanceTests.sln`: the projects from § 3.1 (EEBusSimulations, EEBusCLI,
-  EEBusConformance_Tests, EEBusInterop_Tests) + a `ProjectReference` into the
-  `libs/WWCP_EEBus` projects.
+* `EEBUSConformanceTests.sln`: the projects from § 3.1 (EEBUSSimulations, EEBUSCLI,
+  EEBUSConformance_Tests, EEBUSInterop_Tests) + a `ProjectReference` into the
+  `libs/WWCP_EEBUS` projects.
 * `Directory.Build.props`: net10.0, LangVersion latest, Nullable, TreatWarningsAsErrors,
   shared versions. `.gitignore`: among others `docs/specs/`.
 * GitHub Actions: submodules, `dotnet build` + `dotnet test` (Windows + Linux); a second job
@@ -492,16 +492,16 @@ An inventory of `libs/WWCP_EEBus` (2026-07-26) and the refactoring tasks:
 * **Acceptance:** the CI is green on both operating systems (the interoperability category
   excluded for now).
 
-### WP01 — the SHIP message model and EEBusJSON *(M; only WP00 needed)* ✅ **done**
+### WP01 — the SHIP message model and EEBUSJSON *(M; only WP00 needed)* ✅ **done**
 
-* Port `libs/ship-go/model/model.go` + `model/types.go` into `WWCP_EEBus_SHIP/Messages/`
+* Port `libs/ship-go/model/model.go` + `model/types.go` into `WWCP_EEBUS_SHIP/Messages/`
   (ConnectionHello, MessageProtocolHandshake(+Error), ConnectionPinState/…,
   AccessMethodsRequest/AccessMethods, ShipData, ConnectionClose; the
   `ShipMessageExchangeState` enumeration with the same values 0–39, so that log data can be
   compared).
-* `EEBusJSON` (see § 3.3) including its tolerance modes.
+* `EEBUSJSON` (see § 3.3) including its tolerance modes.
 * Framing: `SHIPFrame.TryParse(ReadOnlyMemory<byte>)` / `.ToBytes()` (type byte + payload).
-* **Tests:** golden roundtrips for every message; the EEBus JSON examples from § 2.1;
+* **Tests:** golden roundtrips for every message; the EEBUS JSON examples from § 2.1;
   fuzz-like robustness (empty, only the type byte, more than 100 KiB, invalid UTF-8, a `0x00`
   suffix).
 
@@ -529,7 +529,7 @@ An inventory of `libs/WWCP_EEBus` (2026-07-26) and the refactoring tasks:
 * An inventory of the Hermod DNS: `DNS/Server/DNSServer.cs` (UDP multicast available),
   `DNSServiceInstanceName`, the SRV/PTR/TXT/A/AAAA records. Add what is missing (within
   Hermod, as an extension fit for a pull request, or for now within
-  `WWCP_EEBus_SHIP/Discovery/`):
+  `WWCP_EEBUS_SHIP/Discovery/`):
   * **Responder:** announce and unannounce `<instance>._ship._tcp.local` (PTR, SRV, TXT,
     A/AAAA), including goodbye packets (TTL 0), with minimal probing and conflict handling.
   * **Browser:** a continuous search and resolution, with events on add/update/remove; TXT
@@ -579,28 +579,28 @@ state machine:
 * **Tests:** a full handshake C# client ↔ C# server, in memory and over real sockets
   (localhost, throwaway certificates); a double connection in both directions; a rejected
   trust decision; a reconnect after a kill.
-* **First interoperability milestones:** `dotnet EEBusCLI ship-listen` ↔
+* **First interoperability milestones:** `dotnet EEBUSCLI ship-listen` ↔
   `go run ./examples/quickstart` (from `libs/ship-go`) in both directions, up to
   `SmeStateComplete`.
 
 ### WP06 — the SPINE data model *(XL → parallelisable; needs WP-W0)*
 
-The goal: the complete SPINE 1.3.0 model within `WWCP_EEBus_SPINE/Model/`. **The primary
+The goal: the complete SPINE 1.3.0 model within `WWCP_EEBUS_SPINE/Model/`. **The primary
 strategy is code generation from the 76 official XSDs** (for the path see appendix B, "SPINE
 XSDs"); spine-go serves as the oracle for the JSON field names and behavioural details.
 
-* **6a the generator (first, M):** a small tool `Apps/EEBusModelGen` (in this repository,
+* **6a the generator (first, M):** a small tool `Apps/EEBUSModelGen` (in this repository,
   because the XSDs live here): it parses the XSDs (`System.Xml.Schema`/`XmlSchemaSet`) and
   generates one C# file per resource, following fixed rules:
   * `xs:simpleType` enumerations with an `EnumExtendType` union → **extensible string types**
-    in the existing `PredefinedStrings` style of WWCP_EEBus (no C# `enum`! Unknown values have
+    in the existing `PredefinedStrings` style of WWCP_EEBUS (no C# `enum`! Unknown values have
     to remain transportable);
   * complex types → classes with nullable properties + `JsonProperty` (camel case like the XSD
     element names; the comparison against the spine-go `json:` tags is a generator test);
   * generate the `…ElementsType`/`…SelectorsType`/`…ListDataType` mechanically as well;
   * the function metadata (function name ↔ type ↔ selectors ↔ elements, the primary keys from
     `PRIMARYKEY_TAG_GUIDELINES.md`) as a generated registry
-    (`[EEBusFunction("loadControlLimitListData", …)]`).
+    (`[EEBUSFunction("loadControlLimitListData", …)]`).
   * The generated code is **checked in** (the generator runs on demand, not during the build).
 * **6b the core review (M):** sharpen the generated core parts manually (CommonDataTypes,
   Datagram, CommandFrame, NodeManagement/NetworkManagement, subscription and binding
@@ -714,7 +714,7 @@ In order of priority:
   structure (a JSON configuration with the field names of the sheet; an XLSX import can follow
   later).
 * Our own additional cases beyond the official specifications (e.g. the device quirks from § 9,
-  ship-go behavioural details, EEBus JSON robustness) carry the prefix `TC_OCC_*`
+  ship-go behavioural details, EEBUS JSON robustness) carry the prefix `TC_OCC_*`
   (OpenChargingCloud) — cleanly separated from the official catalog.
 * Runnable against: (a) our own stack (a self test), (b) **any external device** (a
   configuration file: the target by mDNS filter or host and port, our own SKI and certificate,
@@ -727,7 +727,7 @@ In order of priority:
 
 ### WP12 — the interoperability harness *(L; needs WP05 for the SHIP part, WP09 for the use case part)*
 
-* `EEBusInterop_Tests` and the helper class `GoPeer`: it starts the Go examples as processes
+* `EEBUSInterop_Tests` and the helper class `GoPeer`: it starts the Go examples as processes
   (`go run ./examples/…` with pre-generated certificates and SKIs, fixed ports, `-autoaccept`
   flags; the working directory is the respective submodule), waits for log markers, and cleans
   up reliably (killing the process tree, waiting for the port). All of them with
@@ -741,7 +741,7 @@ In order of priority:
   | `eebus-go/examples/hems` ↔ our EVSE/EV simulation | SPINE + use cases | the same from the other direction |
   | `eebus-go/examples/controlbox` ↔ our controllable system | use case LPC | limit/failsafe/heartbeat (the §14a chain) |
   | `eebus-go/examples/ced` ↔ our energy guard | use case LPC | the same from the other direction |
-  | EVCC (a binary via Docker, with an EEBus configuration) | end to end | our CS-LPC as a "controllable device" attached to the EVCC HEMS |
+  | EVCC (a binary via Docker, with an EEBUS configuration) | end to end | our CS-LPC as a "controllable device" attached to the EVCC HEMS |
   | `EEBUS.Net` (dotnet) | SHIP | a foreign C# peer, the SHIP handshake |
   | `libs/devices-app` (`go run .` → web UI :7050, EEBUS :4815) | SHIP + SPINE | GUI pairing against our server; a manual visual check of our discovery and use case data (semi-automatic: start the app headless, pair through REST?) |
   | `openeebus` (C, optional) | SHIP/SPINE | a stretch goal |
@@ -775,7 +775,7 @@ In order of priority:
 ## 5. The e-mobility simulations (WP10 in detail)
 
 Every simulation is a **library plus a CLI verb**
-(`EEBusCLI sim <name> [--script … --speed …]`), runs either interactively (Styx.CLI) or driven
+(`EEBUSCLI sim <name> [--script … --speed …]`), runs either interactively (Styx.CLI) or driven
 by a script (a JSON scenario with a time axis), and **entirely on a TimeProvider** (which
 enables the time-lapse mode `--speed 60` and deterministic tests).
 
@@ -887,7 +887,7 @@ where Hermod APIs deliver timestamps, we convert at the boundary.
 2. **mDNS on Windows and in the CI:** the coexistence on port 5353, no multicast in the CI →
    direct addressing as a first class feature (which is practical for conformance tests in a
    lab as well).
-3. **The EEBus JSON order:** the Newtonsoft `JObject` preserves the order — assert it in a
+3. **The EEBUS JSON order:** the Newtonsoft `JObject` preserves the order — assert it in a
    test; never use a `Dictionary<string,…>` on the wire path.
 4. **Device quirks:** the PMCC `0x00` suffix; the KEO stack uses several identical entities
    (there is an eebus-go workaround in `cs/lpc/usecase.go` — choosing the heartbeat source);
@@ -903,7 +903,7 @@ where Hermod APIs deliver timestamps, we convert at the boundary.
 7. **Concurrency:** ship-go documents deadlock and race traps (`CONCURRENCY_GUIDE.md` in
    `ship/` and `hub/`) — in C# use channels and `await` instead of locks, and serialise sending
    per connection through a writer queue.
-8. **The WWCP_EEBus refactoring:** have Achim confirm the A/B decision about the `WWCP_Core`
+8. **The WWCP_EEBUS refactoring:** have Achim confirm the A/B decision about the `WWCP_Core`
    dependency (WP-W0) before WP01; push the submodule commits only after approval. Removing
    `CustomData` from the SHIP wire types is a breaking change against the previous skeleton —
    intentionally so.
@@ -965,7 +965,7 @@ interoperability proof in the `docs/reports/` folder; no raw use of `DateTime.No
 | The SHIP messages, complete | `libs/ship-go/model/model.go` |
 | The SHIP state machine states (0–39) | `libs/ship-go/model/types.go` |
 | The hello state machine including prolongation | `libs/ship-go/ship/hs_hello.go` |
-| The EEBus JSON transformation | `libs/ship-go/ship/helper.go` |
+| The EEBUS JSON transformation | `libs/ship-go/ship/helper.go` |
 | The double connection rule | `libs/ship-go/hub/hub_connections_registry.go` |
 | The structure of the mDNS TXT record | `libs/ship-go/mdns/mdns.go` (around line 700) |
 | Certificate/SKI/cipher suites | `libs/ship-go/cert/cert.go` |
@@ -980,7 +980,7 @@ interoperability proof in the `docs/reports/` folder; no raw use of `DateTime.No
 | MPC server | `libs/eebus-go/usecases/mu/mpc/usecase.go` |
 | The service assembly | `libs/eebus-go/service/service.go`, `api/configuration.go` |
 | The interoperability examples | `libs/eebus-go/examples/{hems,evse,controlbox,ced}` |
-| The SHIP specification 1.0.1 (PDF + XSD) | `docs/specs/SHIP SPINE/Technical Specifications/EEBus_SHIP_TS_Specification_v1.0.1-1/EEBus_SHIP_TS_Specification_v1.0.1/` (chapter 11 = EEBus JSON, chapter 13.4 = the state machines) |
+| The SHIP specification 1.0.1 (PDF + XSD) | `docs/specs/SHIP SPINE/Technical Specifications/EEBus_SHIP_TS_Specification_v1.0.1-1/EEBus_SHIP_TS_Specification_v1.0.1/` (chapter 11 = EEBUS JSON, chapter 13.4 = the state machines) |
 | The SHIP specification 1.1.0 (delta review) | `docs/specs/SHIP SPINE/Technical Specifications/EEBus_SHIP_TS_Specification_v1.1.0_public/EEBus_SHIP_TS_Specification_v1.1.0_public/` |
 | The SPINE XSDs (the code generation source) | `docs/specs/SHIP SPINE/Technical Specifications/EEBus_SPINE_V1.3.0/EEBus_SPINE_V1.3.0_Final_hp/XSDs/` (76 files) |
 | The SPINE PDFs | `docs/specs/SHIP SPINE/Technical Specifications/EEBus_SPINE_V1.3.0/EEBus_SPINE_V1.3.0_Final_hp/Documentation/` |
@@ -988,5 +988,5 @@ interoperability proof in the `docs/reports/` folder; no raw use of `DateTime.No
 | The official test specifications (SHIP/SPINE/pairing) | `docs/specs/SHIP SPINE/Test Specifications/` (each a PDF + a parameter sheet XLSX) |
 | The use case high level test specifications LPC/LPP/MGCP/MPC | `docs/specs/Grid/Test Specifications/` |
 | The use case specifications grid / e-mobility / HVAC / inverter | `docs/specs/{Grid,E-Mobility,HVAC,Inverter}/Technical Specifications/` |
-| The existing C# SHIP code | `libs/WWCP_EEBus/WWCP_EEBus_SHIP/` (Messages, DataStructures, PredefinedStrings) |
-| The C# style template for TryParse/ToJSON + the license header | `libs/WWCP_EEBus/WWCP_EEBus_SHIP/Messages/ASHIPMessage.cs`, `…/DataStructures/Complex/ConnectionHello.cs` |
+| The existing C# SHIP code | `libs/WWCP_EEBUS/WWCP_EEBUS_SHIP/` (Messages, DataStructures, PredefinedStrings) |
+| The C# style template for TryParse/ToJSON + the license header | `libs/WWCP_EEBUS/WWCP_EEBUS_SHIP/Messages/ASHIPMessage.cs`, `…/DataStructures/Complex/ConnectionHello.cs` |

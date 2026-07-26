@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
- * This file is part of EEBusConformanceTests <https://github.com/OpenChargingCloud/EEBusConformanceTests>
+ * This file is part of EEBUSConformanceTests <https://github.com/OpenChargingCloud/EEBUSConformanceTests>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@
 
 using NUnit.Framework;
 
-using cloud.charging.open.protocols.EEBus.Conformance.tests;
+using cloud.charging.open.protocols.EEBUS.Conformance.tests;
 
 #endregion
 
-namespace cloud.charging.open.protocols.EEBus.Interop.tests
+namespace cloud.charging.open.protocols.EEBUS.Interop.tests
 {
 
     /// <summary>
@@ -66,7 +66,7 @@ namespace cloud.charging.open.protocols.EEBus.Interop.tests
             Assert.Multiple(() => {
                 Assert.That(File.Exists(Path.Combine(TestEnvironment.ShipGo. FullName, "go.mod")),  Is.True);
                 Assert.That(File.Exists(Path.Combine(TestEnvironment.SpineGo.FullName, "go.mod")),  Is.True);
-                Assert.That(File.Exists(Path.Combine(TestEnvironment.EEBusGo.FullName, "go.mod")),  Is.True);
+                Assert.That(File.Exists(Path.Combine(TestEnvironment.EEBUSGo.FullName, "go.mod")),  Is.True);
             });
 
         }

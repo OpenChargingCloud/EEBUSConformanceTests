@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>cloud.charging.open.protocols.EEBUS.Conformance.tests</RootNamespace>
+    <AssemblyName>cloud.charging.open.protocols.EEBUS.Conformance.tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\libs\WWCP_EEBUS\WWCP_EEBUS_SHIP\WWCP_EEBUS_SHIP.csproj" />
+    <ProjectReference Include="..\..\libs\WWCP_EEBUS\WWCP_EEBUS_SPINE\WWCP_EEBUS_SPINE.csproj" />
+    <ProjectReference Include="..\..\libs\WWCP_EEBUS\WWCP_EEBUS_UseCases\WWCP_EEBUS_UseCases.csproj" />
+  </ItemGroup>
+
+</Project>

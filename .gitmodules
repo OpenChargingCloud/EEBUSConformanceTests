@@ -20,6 +20,6 @@
 	path = libs/devices
 	url = https://github.com/enbility/devices.git
 	ignore = dirty
-[submodule "libs/WWCP_EEBus"]
-	path = libs/WWCP_EEBus
-	url = https://github.com/OpenChargingCloud/WWCP_EEBus.git
+[submodule "libs/WWCP_EEBUS"]
+	path = libs/WWCP_EEBUS
+	url = https://github.com/OpenChargingCloud/WWCP_EEBUS.git

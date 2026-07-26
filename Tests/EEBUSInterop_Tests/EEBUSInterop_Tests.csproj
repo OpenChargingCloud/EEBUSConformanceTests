@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>cloud.charging.open.protocols.EEBUS.Interop.tests</RootNamespace>
+    <AssemblyName>cloud.charging.open.protocols.EEBUS.Interop.tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\EEBUSSimulations\EEBUSSimulations.csproj" />
+    <ProjectReference Include="..\EEBUSConformance_Tests\EEBUSConformance_Tests.csproj" />
+  </ItemGroup>
+
+</Project>

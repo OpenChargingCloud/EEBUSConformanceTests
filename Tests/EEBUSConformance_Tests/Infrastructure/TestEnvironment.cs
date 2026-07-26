@@ -1,6 +1,6 @@
 ﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
- * This file is part of EEBusConformanceTests <https://github.com/OpenChargingCloud/EEBusConformanceTests>
+ * This file is part of EEBUSConformanceTests <https://github.com/OpenChargingCloud/EEBUSConformanceTests>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-namespace cloud.charging.open.protocols.EEBus.Conformance.tests
+namespace cloud.charging.open.protocols.EEBUS.Conformance.tests
 {
 
     /// <summary>
     /// Locates the reference material a conformance test run may want to use:
-    /// the EEBus specifications, the recorded responses of real devices and the
+    /// the EEBUS specifications, the recorded responses of real devices and the
     /// Go reference implementations.
     ///
     /// Only the git submodules are guaranteed to be present. The specifications
@@ -39,13 +39,13 @@ namespace cloud.charging.open.protocols.EEBus.Conformance.tests
         #region Properties
 
         /// <summary>
-        /// The root directory of the EEBusConformanceTests repository.
+        /// The root directory of the EEBUSConformanceTests repository.
         /// </summary>
         public static DirectoryInfo  RepositoryRoot
             => repositoryRoot.Value;
 
         /// <summary>
-        /// The EEBus specifications (SHIP, SPINE, use cases, test specifications).
+        /// The EEBUS specifications (SHIP, SPINE, use cases, test specifications).
         /// Not part of the repository: licensed material, see WORKPLAN.md chapter 1.2.
         /// </summary>
         public static DirectoryInfo  Specifications
@@ -71,9 +71,9 @@ namespace cloud.charging.open.protocols.EEBus.Conformance.tests
             => Subdirectory("libs", "spine-go");
 
         /// <summary>
-        /// The EEBus use case implementation in Go (git submodule "enbility/eebus-go").
+        /// The EEBUS use case implementation in Go (git submodule "enbility/eebus-go").
         /// </summary>
-        public static DirectoryInfo  EEBusGo
+        public static DirectoryInfo  EEBUSGo
             => Subdirectory("libs", "eebus-go");
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace cloud.charging.open.protocols.EEBus.Conformance.tests
 
             if (!directory.Exists)
                 NUnit.Framework.Assert.Inconclusive(
-                    $"The EEBus specifications are not available at '{directory.FullName}'. " +
+                    $"The EEBUS specifications are not available at '{directory.FullName}'. " +
                      "They are licensed material and therefore not part of this repository, " +
                      "see WORKPLAN.md chapter 1.2."
                 );
