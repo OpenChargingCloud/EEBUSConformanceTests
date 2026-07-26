@@ -285,6 +285,45 @@ Held by `CEVCTests.Scenario3_TheBrokerWritesPricesIntoTheTariffTheCarDescribed`.
 
 ---
 
+### U5 — the Porsche PMCC announces every use case under the actor `EV`
+
+*Found: 2026-07-26 (WP10), by replaying
+`libs/devices/porsche/mobile-charger-connect/usecase-data.json` through
+`sim device-replay`.*
+
+Finding U3 recorded that the PMCC announces the **EVSE commissioning** use case
+as the actor `EV`. Replaying the recording rather than reading about it shows
+that this is not one mistake but a policy: the device puts **all eight** of its
+use cases under a single `useCaseInformation` entry with `actor: "EV"` —
+including `evseCommissioningAndConfiguration` and `evChargingSummary`, both of
+which the specifications place at the EVSE.
+
+| Use case | Actor per specification | Actor announced |
+|---|---|---|
+| `evCommissioningAndConfiguration` | EV | EV |
+| `measurementOfElectricityDuringEvCharging` | EV | EV |
+| `optimizationOfSelfConsumptionDuringEvCharging` | EV | EV |
+| `overloadProtectionByEvChargingCurrentCurtailment` | EV | EV |
+| `coordinatedEvCharging` | EV | EV |
+| `evStateOfCharge` | EV | EV |
+| **`evseCommissioningAndConfiguration`** | **EVSE** | EV |
+| **`evChargingSummary`** | **EVSE** | EV |
+
+**What we do:** we tolerate it where there is a precedent to follow and not
+otherwise. `EVSECCEnergyManager` accepts `EV` as well as `EVSE`, because
+eebus-go does and documents why (U3). `EVCSEnergyBroker` accepts only `EVSE`,
+because the EV charging summary has no reference implementation and inventing a
+tolerance from one device's recording would be guessing at what the field does.
+
+**Consequence:** an energy manager built strictly to the specification can name
+a PMCC and read its charging summary from neither. The replay names that
+situation for what it is — "implements *X* but found no partner for it, the
+device announced it under an actor this side does not accept" — rather than as
+a gap in the implementation, because the two have different owners. Held by
+`SimulationTests.DeviceReplay_TheReportNamesAnActorMismatchAsSuch`.
+
+---
+
 ## SHIP
 
 ### H1 — the cipher suites of chapter 9.1 do not cover TLS 1.3

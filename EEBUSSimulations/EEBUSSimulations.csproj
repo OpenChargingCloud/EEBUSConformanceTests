@@ -6,6 +6,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      FakeTimeProvider outside a test project, on purpose: a simulation *is* a
+      controlled clock. Running a two-hour failsafe duration against the wall
+      clock would take two hours and would not be reproducible (WORKPLAN § 8).
+    -->
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\libs\WWCP_EEBUS\WWCP_EEBUS_SHIP\WWCP_EEBUS_SHIP.csproj" />
     <ProjectReference Include="..\libs\WWCP_EEBUS\WWCP_EEBUS_SPINE\WWCP_EEBUS_SPINE.csproj" />
     <ProjectReference Include="..\libs\WWCP_EEBUS\WWCP_EEBUS_UseCases\WWCP_EEBUS_UseCases.csproj" />

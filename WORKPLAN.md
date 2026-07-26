@@ -47,11 +47,12 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/5** | ✅ done — **EVSECC, EVCC, EVCEM and EVSOC** (`WWCP_EEBUS_UseCases/Commissioning/`, `EVSECC/`, `EVCC/`, `EVCEM/`, `EVSOC/`): the commissioning pair got a shared profile-driven layer for the two facts every commissioning use case carries (manufacturer data, operating state), the measuring pair became two more `MonitoringProfile`s. EVSOC is where the monitoring shape stops — **not every measured quantity is on a wire**, so a state of charge gets no phase, no electrical connection parameter description and no commodity type. This is also the work package where one entity playing four server actors becomes the normal case, which turned up a **defect in OPEV from WP09/2**: it replaced three shared list functions wholesale and deleted the charging power limits of EVCC. ADR `docs/adr/0007-monitoring-is-not-always-electrical.md`, findings U1–U3. 42 new tests, 139 in the use case suite |
 | **WP09/6** | ✅ done — **OSCEV and CEVC** (`WWCP_EEBUS_UseCases/ChargingCurrent/`, `OSCEV/`, `CEVC/`). OSCEV is OPEV with a **recommendation** instead of an obligation, so the two now share a profile-driven pair of actors; the one real difference is behaviour and it follows from that word — a car which loses its energy guard falls back to a safe current, a car which loses its energy manager just stops taking the advice. CEVC is the largest use case in the family: **three actors**, the TimeSeries and IncentiveTable models, and `updateRequired` — the only way a SPINE server can ask anybody for anything. It also broke an assumption the use case framework had held since WP08: **a partner may play two actors of one use case**, and the second entry was overwriting the first. ADR `docs/adr/0008-one-partner-many-actors.md`. 25 new tests, 164 in the use case suite |
 | **WP09/7** | ✅ done — **EVCS** (`WWCP_EEBUS_UseCases/EVCS/`), and with it **WP09 is complete**: all thirteen use cases of the plan on both sides. The only one with no Go reference, so purely specification driven — which was the point of doing it. Two things in it are the reverse of what one expects and both are tests now: the **EVSE is the server** and the broker writes into it, and the positions of a charging summary are **percentages of the total** rather than amounts of their own. The generated model had every type and value the document names, so the specification-to-code pipeline held; the one thing needing judgement rather than transcription was that percentage reading. 11 new tests, 175 in the use case suite |
-| WP10–WP14 | open (order see § 10) |
+| **WP10** | ✅ done — **the e-mobility simulations** (`EEBUSSimulations/`, `eebus sim <name>`): the five scenarios of § 5 on one `FakeTimeProvider`, each producing a story with rule numbers and a table of numbers over time. The most valuable of them is `device-replay`, which feeds the **recorded answers of real products** through the ordinary datagram path and reports not what the device said but **what our stack could do with it** — a real Elli wallbox announces seven use cases and we can play all seven, including the EV charging summary, which has no Go reference and was written from the specification alone. It also turned finding U3 into U5. 15 smoke tests |
+| WP11–WP14 | open (order see § 10) |
 
 **Test inventory:** 119 SHIP + 126 SPINE + 175 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
-bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
+bench, 15 simulation smoke tests, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
 
 **Wire format bugs found in the existing code and fixed** (all of them uncovered by the new
@@ -942,7 +943,30 @@ In order of priority:
   assertions (e.g. LPC: write a limit → a notify at the energy guard; a heartbeat failure → a
   failsafe event).
 
-### WP10 — the e-mobility simulations *(L; needs WP09/1–3; details in § 5)*
+### WP10 — the e-mobility simulations *(L; needs WP09/1–3; details in § 5)* ✅ **done**
+
+> **Result:** `EEBUSSimulations/` with a framework and the five simulations of § 5, `eebus sim
+> <name>` on the command line, and 15 smoke tests in `Tests/EEBUSSimulations_Tests/` which run all
+> of them in about ten seconds.
+>
+> Every simulation is three things: devices with use cases on them, a script of what happens when,
+> and a log of what came out. They talk over the in-memory loopback rather than over SHIP, because
+> what is being simulated is the **use case layer** — a real socket would add nothing to a story
+> about failsafe values and would take away the determinism which makes these double as integration
+> tests. One `FakeTimeProvider` drives everything, so a two-hour failsafe duration and a four-second
+> heartbeat timeout cost the same nothing, and `ASimulationRunsTheSameWayTwice` holds that.
+>
+> The log is deliberately two things: a **story** with a rule number against each line, and a
+> **table** of numbers over time. `--out` writes both (`.md` and `.csv`); the tests assert against
+> both, and which one they ask depends on the question — "did the failsafe activate" is a story
+> question, "what was the power then" is a table question.
+>
+> The one thing which needed care rather than transcription: **a limit's end time is relative to
+> when it was written and does not count itself down**, so a controllable system has to start its
+> own timer when a limit arrives. The state machine deliberately does not do this — rule 908 is not
+> one of its three time-driven transitions, because the duration lives in the data rather than in
+> the state — so a device which forgets would hold a limit for ever. Both LPC simulations do it and
+> say so.
 
 ### WP11 — the conformance test suite *(L; grows along from WP01 on)*
 
@@ -1029,7 +1053,24 @@ In order of priority:
 
 ---
 
-## 5. The e-mobility simulations (WP10 in detail)
+## 5. The e-mobility simulations (WP10 in detail) — ✅ **done**
+
+> All five are implemented; what follows was the plan and is now the description. Run them with
+> `dotnet run --project Apps/EEBUSCLI -- sim <name> [--fault … --speed … --out …]`, or
+> `sim list` to see what there is.
+>
+> Two things came out differently from the plan and better:
+>
+> * **The scenario is C# rather than a JSON script.** A script file would have needed a language
+>   for "write a limit of 4200 W for 30 minutes and then check what the state machine did", which
+>   is C# with extra steps. What the plan actually wanted — a time axis, faults, reproducibility —
+>   is in `ASimulation` and the scenarios are ordinary code against the real use case API. That
+>   also means a simulation cannot drift from the stack without failing to compile.
+> * **`device-replay` answers a better question than "can we parse this".** It registers every
+>   client actor we have on the energy manager before feeding the recording in, so the report ends
+>   with *what our stack could actually do with the device* — matched, or announced-but-unmatched
+>   (an actor mismatch, which is a finding about the device), or not implemented. Those are three
+>   different problems with different owners and the report says which.
 
 Every simulation is a **library plus a CLI verb**
 (`EEBUSCLI sim <name> [--script … --speed …]`), runs either interactively (Styx.CLI) or driven
