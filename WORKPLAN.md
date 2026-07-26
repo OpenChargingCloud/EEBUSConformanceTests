@@ -40,9 +40,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP06c** | ✅ done — the **restricted function exchange** (SPINE 1.3.0, § 5.3.4) as one generic engine over the model metadata, `WWCP_EEBUS_SPINE/Update/`: selector matching (including the exact-match rule for entity addresses), element filters which reach into nested elements, merging by identifiers, the "list item without identifier applies to all entries" rule, the write marks, and `SPINERead` for the answering half of a partial read. **All 29 official example datagrams of Annex A** are tests: read by the model, written back unchanged, put through the EEBUS JSON transformation of SHIP and back, and applied to a defined state. ADR `docs/adr/0003-spine-update-system.md`, four further findings (S4–S7) in `docs/spec-deviations.md` |
 | **WP07** | ✅ done — the **SPINE core** in `WWCP_EEBUS_SPINE/Core/`: the device/entity/feature tree on both sides, `SPINEFunctionData` (one class for all 142 functions), `SPINESender` (message counter, deduplication of unanswered requests, results and replies), `SPINELocalDevice.ProcessDatagram` (addressing, permissions, routing, and a SPINE result for every refusal), **node management** complete (detailed discovery in both directions including the entity add/remove notifies, use case data, destination list, subscription and binding calls), the subscription and binding registries, the **event bus** with core/application levels and the **heartbeat** on a TimeProvider. ADR `docs/adr/0004-spine-core.md`. 47 new tests over a loopback pair of devices which records every datagram |
 | **WP08** | ✅ done — the **use case framework** in `WWCP_EEBUS_UseCases/`: `UseCaseNames`/`UseCaseActors` (SPINE leaves both enumerations deliberately empty), `UseCaseVersion` with the discovery rules of section 3.1.2 which every use case specification repeats, `AUseCase` (registration, availability, partner discovery, scenario matching against the partner's server features, events) and `UseCaseFeature` — one helper instead of the nine typed ones of eebus-go. The rules of `EEBus_UC_IG_GeneralGuidelines_V1.0.0` are applied where they are code and written down in the ADR where they are conformance checks for WP11. ADR `docs/adr/0005-use-case-framework.md`, finding S8 |
-| WP09–WP14 | open (order see § 10) |
+| **WP09/1** | ✅ done — **LPC on both sides** (`WWCP_EEBUS_UseCases/LPC/`): the energy guard and the controllable system, all four scenarios, and the **state machine of section 2.3** which eebus-go leaves to the application. 28 tests: the twelve transitions and Table 1 against a fake clock, and the whole use case over the wire from discovery through binding to the failsafe fallback |
+| WP09/2–WP14 | open (order see § 10) |
 
-**Test inventory:** 118 SHIP + 125 SPINE + 29 use case tests within the stack (4 of them marked
+**Test inventory:** 118 SHIP + 125 SPINE + 58 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -733,15 +734,22 @@ bench "no answer" is a result which has to be reportable.
 
 In order of priority:
 
-1. **LPC** on both sides (`cs/lpc` + `eg/lpc`) — including the pending approval mechanism
-   (`PendingConsumptionLimits`/`ApproveOrDeny…`), the failsafe values, the heartbeat fallback
-   behaviour, the nominal maximum characteristic. **References:** § 2.3 and the eebus-go
-   `public.go`, and now normatively
-   `Grid/Technical Specifications/EEBus_UC_TS_LimitationOfPowerConsumption_V1.0.0_public.pdf`
-   as well as the practical guide
-   `Grid/Implementation Guides/EEBus_UC_IG_LimitationOfPowerConsumption_V1.1.0.pdf`
-   (the §14a rollout details); the test cases of the high level test specification LPC V1.0.2
-   flow into WP11.
+1. **LPC** on both sides — ✅ **done**. `LPCEnergyGuard`, `LPCControllableSystem` and
+   `LPCStateMachine`, driven by
+   `Grid/Technical Specifications/EEBus_UC_TS_LimitationOfPowerConsumption_V1.0.0_public.pdf`.
+   <br>The thing worth knowing: **the state machine of section 2.3 is normative and eebus-go does
+   not implement it** — it exposes the data points and leaves the states to the application. For a
+   test bench that is the wrong way round, because the states and their twelve transitions are
+   exactly what a conformance test asks about and the device under test is somebody else's. All
+   twelve are implemented and tested, together with Table 1 (which limit applies in which state).
+   <br>The write approval of the specification is a synchronous hook
+   (`SPINELocalFeature.WriteApproval`) rather than eebus-go's pending/approve mechanism: the
+   decisions section 2.2 asks for are local and immediate (is the limit ≥ 0, does it follow a
+   heartbeat, can this device apply it). The hook is `async`, so an implementation which needs to
+   ask somebody can.
+   <br>Still open here: the §14a details of
+   `Grid/Implementation Guides/EEBus_UC_IG_LimitationOfPowerConsumption_V1.1.0.pdf` were not read
+   yet, and the LPC V1.0.2 high level test specification flows into WP11.
 2. **OPEV** (`cem/opev` and the specification `EEBus_UC_TS_OverloadProtection…V1.0.1b.pdf`)
    plus the counterpart on the "EV side" (not present as a server use case in eebus-go — we
    build **both** sides, the EV server side following chapter 3 of the specification, and
