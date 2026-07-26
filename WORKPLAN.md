@@ -43,7 +43,8 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/1** | ✅ done — **LPC on both sides** (`WWCP_EEBUS_UseCases/LPC/`): the energy guard and the controllable system, all four scenarios, and the **state machine of section 2.3** which eebus-go leaves to the application. 28 tests: the twelve transitions and Table 1 against a fake clock, and the whole use case over the wire from discovery through binding to the failsafe fallback |
 | **WP09/2** | ✅ done — **OPEV on both sides** (`WWCP_EEBUS_UseCases/OPEV/`), including the **EV side, which eebus-go does not have**: the specification's chapter 3 behaviour of falling back to a safe current when the energy guard goes quiet ([OPEV-005], four seconds) or announces a failure ([OPEV-007]). 12 tests |
 | **WP09/3** | ✅ done — **MPC on both sides** (`WWCP_EEBUS_UseCases/MPC/`): the five scenarios (power, energy, current, voltage, frequency), of which only the first is mandatory. The plainest use case and therefore the one where all the work is in the **descriptions** - a measured value is a number under an identifier, and what it means comes from two descriptions in two features. 11 tests |
-| WP09/4–WP14 | open (order see § 10) |
+| **WP09/4** | ✅ done — **LPP and MGCP** (`WWCP_EEBUS_UseCases/LimitationOfPower/`, `Monitoring/`, `LPP/`, `MGCP/`): both are a use case we already had, pointed elsewhere, so both were **generalised rather than copied** — LPC/LPP now share one profile-driven state machine and pair of actors, MPC/MGCP one profile-driven measuring and watching side. Doing so made "two use cases on one entity" normal (a battery is limited in both directions; a grid meter is regularly an MPC monitored unit too) and turned up **three places which assumed they were alone** on a shared feature, each now pinned by a test. ADR `docs/adr/0006-one-feature-many-use-cases.md`. 16 new tests, 97 in the use case suite |
+| WP09/5–WP14 | open (order see § 10) |
 
 **Test inventory:** 118 SHIP + 125 SPINE + 81 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
@@ -783,7 +784,33 @@ In order of priority:
    <br>Only scenario 1 is mandatory: a meter which knows nothing but its total active power
    implements this use case completely, and the appliance has to be able to tell that from a meter
    which forgot to announce the rest.
-4. **LPP**, **MGCP**.
+4. **LPP**, **MGCP** — ✅ **done**. Both by generalising rather than copying, because both are a
+   use case we already had pointed somewhere else.
+   <br>**LPP** is LPC with three words changed: `produce` instead of `consume`,
+   `failsafeProductionActivePowerLimit` instead of the consumption key, and
+   `powerProductionNominalMax` instead of the consumption maximum. The rule numbers match one for
+   one — [LPP-919] and [LPC-919] are the same sentence — so the state machine, the controllable
+   system and the energy guard moved to `UseCases/LimitationOfPower/` and take a
+   `PowerLimitationProfile` which says which of the two they are; the messages then quote the right
+   specification by themselves. `LPC/` and `LPP/` are three-line subclasses.
+   <br>**MGCP** is MPC pointed at the boundary to the grid, so `UseCases/Monitoring/` now holds the
+   measuring side, the watching side and the description join, parameterised by a
+   `MonitoringProfile`. Three things genuinely differ and each has a test: the scopes are
+   `gridFeedIn`/`gridConsumption` (a grid connection point counts what crosses it, not what a device
+   did) and they are two scenarios here where MPC has one; the momentary power is **signed**, so one
+   measurement answers both directions and a client which took the absolute value would report an
+   exporting house as importing; and **scenario 1 is not a measurement at all** — the PV curtailment
+   limit factor is a configuration value in the device configuration feature, which is what a grid
+   operator's curtailment order looks like once it reaches the building.
+   <br>The interesting part was not either use case. Putting a second use case on an entity is what
+   these two make normal — a battery is limited in both directions, a grid meter is regularly the
+   monitored unit of MPC as well — and SPINE allows only **one feature per feature type and role per
+   entity**. Three places assumed they were alone and were fixed with a test each:
+   `SPINELocalFeature.AddFunction` restarted a function which was already offered (emptying it and
+   narrowing its `possibleOperations`), and both the power limitation and the monitoring server
+   wrote their descriptions over whatever was there, with identifiers starting from one either way.
+   None of it was reachable before this item, and all of it would have been a live interoperability
+   bug on the first real battery. ADR `docs/adr/0006-one-feature-many-use-cases.md`.
 5. **EVSECC**, **EVCC**, **EVCEM**, **EVSOC** (the specifications V1.0.1 respectively EVSOC
    V1.0.0 RC1 are available in `docs/specs/` — take the scenario and feature tables from there).
 6. **OSCEV** (specification V1.0.1b), **CEVC** (specification V1.0.1; TimeSeries and
