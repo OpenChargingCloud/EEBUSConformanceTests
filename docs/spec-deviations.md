@@ -158,6 +158,34 @@ certification, and emit them as `[EEBUSWriteCheck]`. The fixture carries them, s
 tests hold them in place without spine-go being present
 (`SPINEUpdateTests.TheWriteMarks_AreThoseOfTheGoReferenceImplementation`).
 
+### S8 — spine-go drops the selectors of a read when the partner cannot do partial *writes*
+
+*Found: 2026-07-26 (WP08), eebus-go `features/client/feature.go`, `requestData`.*
+
+Before sending a restricted read, the helper of eebus-go removes the selectors and elements when
+the partner cannot answer them:
+
+```go
+// remove the selectors if the remote does not allow partial reads
+// or partial writes, because in that case we need to have all data
+if selectors != nil && (!op.ReadPartial() || !op.WritePartial()) {
+    selectors = nil
+    elements = nil
+}
+```
+
+The comment says "partial reads or partial writes", and so does the code — but whether a partner
+can answer a *read* partially is `possibleOperations.read.partial` alone. A device which offers a
+partial read and no partial write is asked for everything, every time.
+
+**What we do:** `UseCaseFeature.RequestData` looks at the read flag only. The reason for dropping
+them at all is right and worth keeping: SPINE 1.3.0, 5.3.4.5 lets a server ignore a restriction it
+does not support and answer in full, so sending a filter it will ignore is noise.
+
+**Consequence:** where a partner offers a partial read but no partial write, we ask for the part
+and spine-go asks for everything. Both get a valid answer; ours is smaller. Held by
+`UseCaseFrameworkTests.APartialReadIsNotAskedOfAPartnerWhichCannotAnswerIt`.
+
 ---
 
 ## SHIP

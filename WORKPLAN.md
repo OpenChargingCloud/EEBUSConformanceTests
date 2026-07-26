@@ -39,9 +39,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP06b** | ✅ done — the generated types are `partial` and serialise **opt-in**, so the hand-written semantics live under `WWCP_EEBUS_SPINE/Additions/` and cannot leak into a datagram: `ScaledNumberType.Value`/`FromValue` (decimal, exact), the address `ToString`/`Matches`/`Clone`, `TimePeriodType.Duration(TimeProvider)`, `PossibleOperationsType`, `CmdType`/`FilterType`/`CmdControlType` reaching every function through the generated `[EEBUSFunction]` metadata, the one-line datagram overview, the SPINE error numbers, `UseCaseInformationDataType` set/find/supports/remove |
 | **WP06c** | ✅ done — the **restricted function exchange** (SPINE 1.3.0, § 5.3.4) as one generic engine over the model metadata, `WWCP_EEBUS_SPINE/Update/`: selector matching (including the exact-match rule for entity addresses), element filters which reach into nested elements, merging by identifiers, the "list item without identifier applies to all entries" rule, the write marks, and `SPINERead` for the answering half of a partial read. **All 29 official example datagrams of Annex A** are tests: read by the model, written back unchanged, put through the EEBUS JSON transformation of SHIP and back, and applied to a defined state. ADR `docs/adr/0003-spine-update-system.md`, four further findings (S4–S7) in `docs/spec-deviations.md` |
 | **WP07** | ✅ done — the **SPINE core** in `WWCP_EEBUS_SPINE/Core/`: the device/entity/feature tree on both sides, `SPINEFunctionData` (one class for all 142 functions), `SPINESender` (message counter, deduplication of unanswered requests, results and replies), `SPINELocalDevice.ProcessDatagram` (addressing, permissions, routing, and a SPINE result for every refusal), **node management** complete (detailed discovery in both directions including the entity add/remove notifies, use case data, destination list, subscription and binding calls), the subscription and binding registries, the **event bus** with core/application levels and the **heartbeat** on a TimeProvider. ADR `docs/adr/0004-spine-core.md`. 47 new tests over a loopback pair of devices which records every datagram |
-| WP08–WP14 | open (order see § 10) |
+| **WP08** | ✅ done — the **use case framework** in `WWCP_EEBUS_UseCases/`: `UseCaseNames`/`UseCaseActors` (SPINE leaves both enumerations deliberately empty), `UseCaseVersion` with the discovery rules of section 3.1.2 which every use case specification repeats, `AUseCase` (registration, availability, partner discovery, scenario matching against the partner's server features, events) and `UseCaseFeature` — one helper instead of the nine typed ones of eebus-go. The rules of `EEBus_UC_IG_GeneralGuidelines_V1.0.0` are applied where they are code and written down in the ADR where they are conformance checks for WP11. ADR `docs/adr/0005-use-case-framework.md`, finding S8 |
+| WP09–WP14 | open (order see § 10) |
 
-**Test inventory:** 118 SHIP + 123 SPINE + 1 use case tests within the stack (4 of them marked
+**Test inventory:** 118 SHIP + 125 SPINE + 29 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -697,21 +698,36 @@ on the real receive path.
 
 ### WP08 — the use case framework *(M; needs WP07)*
 
-* `UseCaseBase` (≈ `eebus-go/usecases/usecase/usecase.go`): scenario declaration,
-  `AddFeatures()`, `IsCompatibleEntityType`, recognition of remote use cases (comparing
-  `useCaseData`), events (`UseCaseSupportUpdate`, the data update enumerations per use case),
-  registering with and unregistering from the event bus.
-* **The use case discovery version rules** (chapter 2.4 of every use case specification, e.g.
-  the EVCS PDF): the SHALL rules for evaluating `useCaseVersion` (choose the highest compatible
-  version within the same major version, the behaviour on a major version mismatch, the
-  semantics of `useCaseAvailable`) and the tolerance rules (ignore unknown elements and
-  scenarios instead of aborting) — these belong into the UseCaseBase generically, not into the
-  individual use cases.
-* Port the reusable feature helpers (`eebus-go/features/client` + `/server`): LoadControl,
-  Measurement, ElectricalConnection, DeviceConfiguration, DeviceDiagnosis,
-  DeviceClassification, Identification, TimeSeries, IncentiveTable.
-* **Tests:** use case registration → a correct `nodeManagementUseCaseData`; the compatibility
-  matrix.
+✅ **done** — see `docs/adr/0005-use-case-framework.md`.
+
+* `AUseCase`: the declaration (actor, name, version, scenarios) which goes into
+  `nodeManagementUseCaseData`, and the watcher which works out per remote entity which scenarios
+  can be played. A scenario counts as playable only when the partner announces it **and** has the
+  server features that scenario needs — a device which claims a scenario it has no feature for
+  has claimed something it cannot do.
+* `UseCaseVersion`: the discovery rules of section **3.1.2** (not 2.4 as the plan assumed - the
+  section is "Use Case discovery rules" and sits in chapter 3.1), identical in every use case
+  specification, therefore in one place. The rule which is easy to get wrong is the last one: a
+  partner which announces only major versions we do not implement is still worth evaluating.
+* `UseCaseNames` / `UseCaseActors`: SPINE declares both enumerations as **empty** restrictions of
+  a string, which is the specification saying the names come from the use case documents. Taken
+  from spine-go and cross-checked against Annex A of the general guideline — whose table does not
+  survive text extraction from the PDF (its columns drift), so it was used to check names rather
+  than to generate them.
+* `UseCaseFeature`: **one** helper rather than nine. eebus-go needs a class per feature type
+  because Go needs a typed method per data type; our core reads and writes any function by name.
+  What it adds is what is not mechanical: refusing to ask for what the partner never announced,
+  dropping the selectors of a partial read the partner cannot answer (finding S8), writing
+  partially by default (guideline § 3.1), and answering `IsRedundantPolling` (§ 3.2.3).
+* **Tests:** 29, with the two actors of LPC playing against each other over the loopback and
+  nothing arranged by hand.
+
+Three bugs one layer down came out of it, all from the use case layer doing what the SPINE tests
+had not - reading a function which held no data yet: a reply to such a read carried an empty
+command and could not be matched to its read, so the caller waited forever; a message which
+arrived with a `msgCounterReference` and could not be handled stranded its caller; and nothing
+ever timed out. A partner which never answers must not be able to stop this device, and for a
+bench "no answer" is a result which has to be reportable.
 
 ### WP09 — the use cases *(L in total; S–M each, highly parallelisable; needs WP08)*
 
