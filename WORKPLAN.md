@@ -48,10 +48,12 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/6** | ✅ done — **OSCEV and CEVC** (`WWCP_EEBUS_UseCases/ChargingCurrent/`, `OSCEV/`, `CEVC/`). OSCEV is OPEV with a **recommendation** instead of an obligation, so the two now share a profile-driven pair of actors; the one real difference is behaviour and it follows from that word — a car which loses its energy guard falls back to a safe current, a car which loses its energy manager just stops taking the advice. CEVC is the largest use case in the family: **three actors**, the TimeSeries and IncentiveTable models, and `updateRequired` — the only way a SPINE server can ask anybody for anything. It also broke an assumption the use case framework had held since WP08: **a partner may play two actors of one use case**, and the second entry was overwriting the first. ADR `docs/adr/0008-one-partner-many-actors.md`. 25 new tests, 164 in the use case suite |
 | **WP09/7** | ✅ done — **EVCS** (`WWCP_EEBUS_UseCases/EVCS/`), and with it **WP09 is complete**: all thirteen use cases of the plan on both sides. The only one with no Go reference, so purely specification driven — which was the point of doing it. Two things in it are the reverse of what one expects and both are tests now: the **EVSE is the server** and the broker writes into it, and the positions of a charging summary are **percentages of the total** rather than amounts of their own. The generated model had every type and value the document names, so the specification-to-code pipeline held; the one thing needing judgement rather than transcription was that percentage reading. 11 new tests, 175 in the use case suite |
 | **WP10** | ✅ done — **the e-mobility simulations** (`EEBUSSimulations/`, `eebus sim <name>`): the five scenarios of § 5 on one `FakeTimeProvider`, each producing a story with rule numbers and a table of numbers over time. The most valuable of them is `device-replay`, which feeds the **recorded answers of real products** through the ordinary datagram path and reports not what the device said but **what our stack could do with it** — a real Elli wallbox announces seven use cases and we can play all seven, including the EV charging summary, which has no Go reference and was written from the specification alone. It also turned finding U3 into U5. 15 smoke tests |
-| WP11–WP14 | open (order see § 10) |
+| **WP11a** | ✅ done — **the conformance test suite, protocol half** (`EEBUSConformance/`, `eebus conform`): the **whole official catalog** — 33 `TC_SHIP_*` and 31 `TC_SPINE_*` cases with their 52 requirements, roles, applicability and preconditions — as checked-in data, and **every one of the 64 executable** against a device. The test tool is deliberately not a SHIP node: half the catalog consists of things a well behaved node would never do, and all of it runs on a `FakeTimeProvider`, so twenty minutes of protocol take a few hundred milliseconds. Against our own stack: **60 passed, 1 warning, 1 failed, 2 not applicable** — and the run found **four real defects** (findings 4–7 in `docs/spec-deviations.md`), the worst of them one line which failed five test cases at once: the data exchange state refused every SME control message, so a perfectly legal access methods request killed the connection. The one failure is `TC_SHIP_CONN_001` and it stays: the specification's double connection rule and the one ship-go implements disagree, and following the specification would break us against the entire installed base (finding C1). 75 conformance tests |
+| **WP11b** | open — **the use case half**: `EEBus_UC_HighLevel_TestSpecification_{LPC,LPP,MGCP,MPC}_V1.0.2` (`docs/specs/Grid/Test Specifications/`), **211 further test cases** (LPC 53, LPP 53, MGCP 49, MPC 56) with their own parameter sheets. A separate branch in § 10 and a work package of its own size: the identifiers are shaped `TC_LPC_COM_PT_CSTransition10_002`, i.e. one case per transition of the state machine of WP09/1, per direction, negative and positive. The machinery they need — catalog, parameter sheet, runner, report, `LpcLppScenario` — already exists |
+| WP12–WP14 | open (order see § 10) |
 
 **Test inventory:** 119 SHIP + 126 SPINE + 175 use case tests within the stack (4 of them marked
-`[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
+`[Category("LocalNetwork")]`: real sockets or multicast), 75 conformance tests within the test
 bench, 15 simulation smoke tests, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
 
@@ -968,7 +970,36 @@ In order of priority:
 > the state — so a device which forgets would hold a limit for ever. Both LPC simulations do it and
 > say so.
 
-### WP11 — the conformance test suite *(L; grows along from WP01 on)*
+### WP11 — the conformance test suite *(L; grows along from WP01 on)* — WP11a ✅ **done**, WP11b open
+
+> **Result.** `EEBUSConformance/` holds the catalog as data (`Catalog/`), the manufacturer
+> declarations (`Parameters/ParameterSheet.cs`), the two test tools (`TestTool/`), the runner and
+> the report (`Runner/`) and the 64 executable cases (`Cases/`). `eebus conform` runs them;
+> `eebus conform list` shows the catalog with a mark against anything not executable.
+>
+> Four things turned out differently from the plan, and all four are better:
+>
+> 1. **The test tool is not a "misbehaving mode" of our own state machine.** It builds frames and
+>    datagrams by hand and speaks only when a step tells it to, because half the catalog is things
+>    a well behaved node would never do. No test hooks were needed in `SHIPConnection` at all,
+>    which also means the thing under test is the shipping code and not a variant of it.
+> 2. **The LPC/LPP flavoured SPINE cases needed a real conversation.** A third of that catalog
+>    checks a protocol rule *inside* a working use case, so `LpcLppScenario` commissions both
+>    sides for real and one hook rewrites the test tool's outgoing datagrams — which is exactly
+>    how the specification words those preconditions ("internally pre-configured to autonomously
+>    append").
+> 3. **`TC_OCC_*` was not needed yet.** Every quirk we know about is already a test somewhere
+>    else; the prefix stays reserved.
+> 4. **A failing case can be a decision rather than a defect.** `TC_SHIP_CONN_001` fails and will
+>    keep failing (finding C1), so the catalog entry carries a `KnownDeviation`: the report says
+>    "failed", the self test says "knowingly", and the reason is one click away in either.
+>
+> **The four defects it found** are findings 4–7 in `docs/spec-deviations.md`. The largest was one
+> `if`: the SHIP data exchange state accepted data messages and nothing else, so an access methods
+> request — legal at any time, and mandatory to answer — closed the connection. Five official test
+> cases failed on it, and every one of our own 119 SHIP tests had passed, because they all asked
+> in the phase where asking was expected.
+
 
 * **The catalog is the official test specifications** (§ 1.2, available locally!). Our NUnit
   tests adopt the **official test case identifiers** one to one (e.g.
@@ -984,9 +1015,10 @@ In order of priority:
     (detailed discovery, disconnecting a silent partner), BIND (deny a node management binding,
     reject a write without a binding), SUBS (idempotent deletion), ENTITY (dynamic entities),
     RTS/RTC (the server and client tolerance rules, the RFE merge with `ScaledNumberType`).
-  * The use case level: the **high level test specifications V1.0.2** for LPC/LPP/MGCP/MPC
-    (`Grid/Test Specifications/`), and for pairing
-    `EEBus_SHIP_Pairing_Service_TestSpec_V1.0.0` (WP14).
+  * The use case level (**WP11b, open**): the **high level test specifications V1.0.2** for
+    LPC/LPP/MGCP/MPC (`Grid/Test Specifications/`) — 211 test cases, one per state machine
+    transition per direction — and for pairing `EEBus_SHIP_Pairing_Service_TestSpec_V1.0.0`
+    (WP14).
   * The requirement ↔ test case mapping (chapter 3 of every test specification) is adopted as a
     fixture table — the report then shows the coverage per requirement.
 * **The parameter sheets:** the official `*_ParameterSheet_*.xlsx` files define the parameters

@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\EEBUSConformance\EEBUSConformance.csproj" />
     <ProjectReference Include="..\..\libs\WWCP_EEBUS\WWCP_EEBUS_SHIP\WWCP_EEBUS_SHIP.csproj" />
     <ProjectReference Include="..\..\libs\WWCP_EEBUS\WWCP_EEBUS_SPINE\WWCP_EEBUS_SPINE.csproj" />
     <ProjectReference Include="..\..\libs\WWCP_EEBUS\WWCP_EEBUS_UseCases\WWCP_EEBUS_UseCases.csproj" />

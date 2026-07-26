@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>cloud.charging.open.protocols.EEBUS.Conformance</RootNamespace>
+    <AssemblyName>cloud.charging.open.protocols.EEBUS.Conformance</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      FakeTimeProvider outside a test project, on purpose - for the same reason
+      the simulations use it: a conformance test tool has to be able to sit out
+      a 30 second CmiTimeout or a four minute Wait-For-Ready timer. Against the
+      wall clock the SHIP suite alone would run for the better part of an hour
+      and would not be reproducible (WORKPLAN § 8).
+    -->
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\libs\WWCP_EEBUS\WWCP_EEBUS_SHIP\WWCP_EEBUS_SHIP.csproj" />
+    <ProjectReference Include="..\libs\WWCP_EEBUS\WWCP_EEBUS_SPINE\WWCP_EEBUS_SPINE.csproj" />
+    <ProjectReference Include="..\libs\WWCP_EEBUS\WWCP_EEBUS_UseCases\WWCP_EEBUS_UseCases.csproj" />
+  </ItemGroup>
+
+</Project>

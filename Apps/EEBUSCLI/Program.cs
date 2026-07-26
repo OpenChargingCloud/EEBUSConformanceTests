@@ -19,6 +19,7 @@
 
 using System.Globalization;
 
+using cloud.charging.open.protocols.EEBUS.Conformance;
 using cloud.charging.open.protocols.EEBUS.Simulations;
 
 using SHIP  = cloud.charging.open.protocols.EEBUS.SHIP;
@@ -51,6 +52,9 @@ namespace cloud.charging.open.protocols.EEBUS.CLI
 
                 case "sim":
                     return await RunSimulation(Arguments.Skip(1).ToArray());
+
+                case "conform":
+                    return await RunConformance(Arguments.Skip(1).ToArray());
 
                 case "help":
                 case "--help":
@@ -179,7 +183,110 @@ namespace cloud.charging.open.protocols.EEBUS.CLI
 
         #endregion
 
-        #region (private) PrintVersion() / PrintSimulations() / PrintHelp()
+        #region (private) RunConformance(Arguments)
+
+        private static async Task<Int32> RunConformance(String[] Arguments)
+        {
+
+            var verb = Arguments.FirstOrDefault() ?? "run";
+
+            if (verb is "list" or "--list")
+            {
+                PrintCatalog();
+                return 0;
+            }
+
+            String?  filter      = null;
+            String?  output      = null;
+            String?  sheet       = null;
+
+            for (var index = verb == "run" ? 1 : 0; index < Arguments.Length; index++)
+            {
+
+                var value = index + 1 < Arguments.Length ? Arguments[index + 1] : null;
+
+                switch (Arguments[index])
+                {
+
+                    case "--only" when value is not null:
+                        filter = value;
+                        index++;
+                        break;
+
+                    case "--sheet" when value is not null:
+                        sheet = value;
+                        index++;
+                        break;
+
+                    case "--out" when value is not null:
+                        output = value;
+                        index++;
+                        break;
+
+                    default:
+                        Console.Error.WriteLine($"Unknown option '{Arguments[index]}'.");
+                        return 1;
+
+                }
+
+            }
+
+            var parameters = ParameterSheet.TryLoad(sheet is not null ? new FileInfo(sheet) : null);
+            var complaints = parameters.Validate().ToList();
+
+            if (complaints.Count > 0)
+            {
+
+                Console.Error.WriteLine("The parameter sheet is not usable:");
+
+                foreach (var complaint in complaints)
+                    Console.Error.WriteLine($"  {complaint}");
+
+                return 1;
+
+            }
+
+            using var stopping = new CancellationTokenSource();
+
+            Console.CancelKeyPress += (_, eventArgs) => {
+                eventArgs.Cancel = true;
+                stopping.Cancel();
+            };
+
+            var run = await ConformanceRunner.Run(parameters, filter, stopping.Token);
+
+            Console.Write(ConformanceReport.ToText(run));
+
+            if (output is not null)
+            {
+
+                var folder = Path.GetDirectoryName(Path.GetFullPath(output));
+
+                if (folder is not null)
+                    Directory.CreateDirectory(folder);
+
+                await File.WriteAllTextAsync($"{output}.md",  ConformanceReport.ToMarkdown(run), stopping.Token);
+                await File.WriteAllTextAsync($"{output}.csv", ConformanceReport.ToCSV(run),      stopping.Token);
+
+                Console.WriteLine($"written to {output}.md and {output}.csv");
+
+            }
+
+            // A mandatory case which applied, did not pass, and which nobody has
+            // decided about is the only thing which makes this command fail.
+            // Everything else - a case which does not apply, a case nobody has
+            // written yet, a failure this repository has already weighed up and
+            // written down - is information rather than a verdict.
+            foreach (var known in run.Blocking.Where(outcome => outcome.TestCase.KnownDeviation is not null))
+                Console.WriteLine($"{known.TestCase.Id} fails knowingly: {known.TestCase.KnownDeviation}");
+
+            return run.Unexpected.Any() ? 1 : 0;
+
+        }
+
+        #endregion
+
+        #region (private) PrintVersion() / PrintSimulations() / PrintCatalog() / PrintHelp()
 
         private static void PrintVersion()
         {
@@ -216,6 +323,33 @@ namespace cloud.charging.open.protocols.EEBUS.CLI
         }
 
 
+        private static void PrintCatalog()
+        {
+
+            Console.WriteLine("Conformance catalog:");
+            Console.WriteLine();
+
+            foreach (var group in ConformanceCatalog.TestCases.GroupBy(testCase => (testCase.Layer, testCase.Group)))
+            {
+
+                Console.WriteLine($"  {group.Key.Layer} {group.Key.Group}");
+
+                foreach (var testCase in group)
+                    Console.WriteLine($"    {(ConformanceSuite.TestFor(testCase.Id) is not null ? " " : "?")} " +
+                                      $"{testCase.Id,-22} {testCase.Title}");
+
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"  {ConformanceCatalog.TestCases.Count} test cases, " +
+                              $"{ConformanceSuite.Implemented.Count()} of them executable " +
+                              $"(a '?' marks one which is not).");
+            Console.WriteLine($"  {ConformanceCatalog.Requirements.Count} requirements.");
+            Console.WriteLine();
+
+        }
+
+
         private static void PrintHelp()
         {
 
@@ -225,6 +359,8 @@ namespace cloud.charging.open.protocols.EEBUS.CLI
             Console.WriteLine("  version                Show the implemented EEBUS protocol versions");
             Console.WriteLine("  sim list               List the simulations");
             Console.WriteLine("  sim <name> [options]   Run one");
+            Console.WriteLine("  conform list           List the conformance test catalog");
+            Console.WriteLine("  conform [options]      Run the catalog against a device");
             Console.WriteLine("  help                   Show this help");
             Console.WriteLine();
             Console.WriteLine("Options of 'sim':");
@@ -233,8 +369,10 @@ namespace cloud.charging.open.protocols.EEBUS.CLI
             Console.WriteLine("  --device <path>    Which recorded device to replay, e.g. porsche/mobile-charger-connect");
             Console.WriteLine("  --out <path>       Write <path>.csv and <path>.md");
             Console.WriteLine();
-            Console.WriteLine("Planned:");
-            Console.WriteLine("  conformance <target>   Run the conformance test catalog (WP11)");
+            Console.WriteLine("Options of 'conform':");
+            Console.WriteLine("  --only <text>      Run only the test cases whose identifier contains this, e.g. TC_SHIP_CMI");
+            Console.WriteLine("  --sheet <path>     The parameter sheet of the device (JSON); omitted runs the self test");
+            Console.WriteLine("  --out <path>       Write <path>.md and <path>.csv");
             Console.WriteLine();
 
         }

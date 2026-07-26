@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\EEBUSSimulations\EEBUSSimulations.csproj" />
+    <ProjectReference Include="..\..\EEBUSConformance\EEBUSConformance.csproj" />
   </ItemGroup>
 
 </Project>

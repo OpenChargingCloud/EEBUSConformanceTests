@@ -342,6 +342,54 @@ specification alone. Details and the platform differences are in the ADR.
 
 ---
 
+## Conformance catalog
+
+Findings of WP11, where running the official test specifications against this stack turned up a
+disagreement rather than a bug of ours. The bugs it turned up are in the section below.
+
+### C1 — the double connection rule of SHIP 12.2.2 and the one everybody implements are not the same
+
+*Found: 2026-07-26 (WP11), `TC_SHIP_CONN_001`.*
+
+SHIP TS 1.0.1 chapter 12.2.2 resolves two simultaneous connections to the same partner by SKI:
+the node with the larger value **keeps the most recent connection** and closes the others. The
+official test case checks exactly that, with the device under test holding the larger SKI.
+
+ship-go does something else, and says so in a comment: *"This is hard to implement without any
+flaws. Therefore I chose a different approach: The connection initiated by the higher SKI will
+be kept"* (`hub/hub_connections_registry.go`). The two rules disagree precisely in the scenario
+of the test case.
+
+They cannot both be followed, and following the specification alone is worse than useless:
+against a ship-go peer — which is EVCC and most of the installed base — the two sides would keep
+*different* connections and neither would work. Our stack therefore follows ship-go, and
+`TC_SHIP_CONN_001` **fails**, on purpose.
+
+**What we do:** `SHIPNode.KeepThisConnection` implements the ship-go rule. The conformance
+report says "failed" for `TC_SHIP_CONN_001`, because that is what a certification body has to
+see; the catalog entry carries the reason as a `KnownDeviation`, so the self test reports it as
+inconclusive-with-explanation rather than turning the build red over a decision which has
+already been taken. If the ecosystem ever converges on the specification's rule, this is a
+one-line change and a deleted paragraph.
+
+### C2 — TC_SHIP_HELLO_001/002/004 expect a server to start the protocol handshake
+
+*Found: 2026-07-26 (WP11).*
+
+The three hello cases run with the device as SHIP **server** and end with "the DUT sends an SME
+protocol handshake message". A server cannot: the three way handshake of chapter 13.4.4.2 begins
+with the *client's* `announceMax`, and `TC_SHIP_PROT_001` — same role, same phase — says so
+outright ("the DUT SHALL wait for the client's announceMax message"). ship-go waits here as
+well.
+
+**What we do:** the test tool, which is the SHIP client in these cases, sends its own
+`announceMax` and then verifies what the step means — that the device left the hello phase and
+answers within the protocol handshake. Sending it is the tool's own next step rather than an
+automatic reply, so `PRE_SHIP_Manual_Message_Handling` does not forbid it. The reading is
+written into `TC_SHIP_HELLO_001.EnteredProtocolHandshake`.
+
+---
+
 ## Wire format bugs found in our own earlier code
 
 Not deviations of anybody else's — kept here because the tests which found them are the reason
@@ -352,3 +400,25 @@ this repository exists (WORKPLAN.md § 0):
 2. The access methods **response** used the element `accessMethodsRequest` instead of
    `accessMethods` — which made the handshake loop forever.
 3. `connectionClose.reason` was read from the JSON property `"dns"` (copy and paste).
+
+Found by the official test specifications in WP11, all four in the stack (`libs/WWCP_EEBUS`):
+
+4. **A server dropped an invalid CMI message without answering it** (`TC_SHIP_CMI_001`,
+   `TC_SHIP_CMI_005`). Chapter 13.4.3 has the server send its own CMI message — "message type 0,
+   CmiHead 0 is all I speak" — *and then* close. Closing silently leaves the client unable to
+   tell an incompatible partner from a broken network. Fixed in
+   `SHIPConnection.RefuseCmiAsync`.
+5. **The data exchange state refused every SME control message** (`TC_SHIP_AM_001`,
+   `TC_SHIP_MSG_003`, `TC_SHIP_AMDATA_001`/`003`). An access methods request may arrive at any
+   time while the connection lives (13.4.6), and answering it is mandatory (`SHIP-TS-ACC-01`) —
+   the connection instead treated it as an unexpected message and closed. Five test cases failed
+   on the same line.
+6. **SPINE data arriving during the access methods exchange was refused as well**
+   (`TC_SHIP_AMDATA_002`), against the implementation guideline § 2.1, which says outright that
+   incoming SPINE messages are passed to the application immediately even while an access
+   methods query is pending. Now they are, and what the application answers is queued until the
+   one state in which SHIP data may be sent.
+7. **A binding to the primary node management feature was accepted** (`TC_SPINE_BIND_001`).
+   SPINE 7.3.1 gives that feature the role "special", which cannot be bound — and a binding to
+   it is a licence to write into the very place where the device keeps its topology, its
+   bindings and its subscriptions. Fixed in `SPINENodeManagement.HandleRelationCall`.

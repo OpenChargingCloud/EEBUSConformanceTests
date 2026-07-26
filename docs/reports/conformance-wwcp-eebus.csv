@@ -1,0 +1,65 @@
+testCase;layer;group;title;dutRole;actor;mandatory;verdict;requirements;note
+TC_SHIP_MDNS_001;SHIP;MDNS;Validate mDNS TXT record;Server;Any;M;passed;SHIP-TS-MDNS-01 SRIP-TS-TXT-01;
+TC_SHIP_CONN_001;SHIP;CONN;Resolve simultaneous connections by SKI (DUT has larger SKI);ServerAndClient;Any;M;failed;SHIP-TS-CONN-01;the device kept the older connection A instead of the most recent one - it resolved the double connection by who initiated rather than by which is newer (the rule of ship-go, which the specification does not share)
+TC_SHIP_ROLE_001;SHIP;ROLE;DUT as SME server;Server;Any;M;passed;SHIP-TS-ROLE-01 SHIP-TS-CMI-01;
+TC_SHIP_ROLE_002;SHIP;ROLE;DUT as SME client;Client;Any;M;passed;SHIP-TS-ROLE-01 SHIP-TS-CMI-01;
+TC_SHIP_ROLE_003;SHIP;ROLE;Simultaneous role polymorphism;ServerAndClient;Any;M;passed;SHIP-TS-ROLE-01;
+TC_SHIP_SEC_001;SHIP;SEC;Reject spoofed certificate (no prior pairing);ServerOrClient;Any;M;passed;SHIP-TS-SEC-01;
+TC_SHIP_SEC_002;SHIP;SEC;Reject spoofed certificate (with prior pairing);ServerOrClient;Any;M;passed;SHIP-TS-SEC-02;
+TC_SHIP_MSG_001;SHIP;MSG;Reject message without MessageValue;ServerOrClient;Any;M;passed;SHIP-TS-MSG-01 SHIP-TS-CMI-01;
+TC_SHIP_MSG_002;SHIP;MSG;Reject unknown MessageType;ServerOrClient;Any;M;passed;SHIP-TS-MSG-02;
+TC_SHIP_MSG_003;SHIP;MSG;Support JSON whitespace formatting;ServerOrClient;Any;M;passed;SHIP-IG-01 SHIP-TS-ACC-01;
+TC_SHIP_CMI_001;SHIP;CMI;Reject invalid MessageType (DUT as server);Server;Any;M;passed;SHIP-TS-CMI-02;
+TC_SHIP_CMI_002;SHIP;CMI;Reject invalid MessageType (DUT as client);Client;Any;M;passed;SHIP-TS-CMI-02;
+TC_SHIP_CMI_003;SHIP;CMI;Apply CmiTimeout (DUT as server);Server;Any;M;passed;SHIP-TS-CMI-04;
+TC_SHIP_CMI_004;SHIP;CMI;Apply CmiTimeout (DUT as client);Client;Any;M;passed;SHIP-TS-CMI-04;
+TC_SHIP_CMI_005;SHIP;CMI;Reject invalid CmiHead (DUT as server);Server;Any;M;passed;SHIP-TS-CMI-03;
+TC_SHIP_CMI_006;SHIP;CMI;Reject invalid CmiHead (DUT as client);Client;Any;M;passed;SHIP-TS-CMI-03;
+TC_SHIP_HELLO_001;SHIP;HELLO;Process valid Hello & enter protocol handshake;Server;Any;M;passed;SHIP-TS-HELLO-01;
+TC_SHIP_HELLO_002;SHIP;HELLO;Accept prolongation requests;Server;Any;M;passed;SHIP-TS-HELLO-02;
+TC_SHIP_HELLO_003;SHIP;HELLO;Apply Wait-For-Ready-Timer (timeout);Server;Any;M;passed;SHIP-TS-HELLO-03;
+TC_SHIP_HELLO_004;SHIP;HELLO;Ignore "pending" updates without prolongationRequest in "ready" state;Server;Any;M;passed;SHIP-TS-HELLO-04;
+TC_SHIP_PROT_001;SHIP;PROT;Support JSON-UTF8 format (DUT as server);Server;Any;M;passed;SHIP-TS-PROT-01;
+TC_SHIP_PROT_002;SHIP;PROT;Support JSON-UTF8 format (DUT as client);Client;Any;M;passed;SHIP-TS-PROT-01;
+TC_SHIP_PROT_003;SHIP;PROT;Apply Wait-Timer (DUT as server);Server;Any;M;passed;SHIP-TS-PROT-02;
+TC_SHIP_PROT_004;SHIP;PROT;Apply Wait-Timer (DUT as client);Client;Any;M;passed;SHIP-TS-PROT-02;
+TC_SHIP_PROT_005;SHIP;PROT;Reject unexpected message (DUT as server);Server;Any;M;passed;SHIP-TS-PROT-03;
+TC_SHIP_PROT_006;SHIP;PROT;Reject unexpected message (DUT as client);Client;Any;M;passed;SHIP-TS-PROT-03;
+TC_SHIP_PIN_001;SHIP;PIN;PIN state none;ServerOrClient;Any;M;passed;SHIP-TS-PIN-01;
+TC_SHIP_TERM_001;SHIP;TERM;Apply maxTime during termination (DUT initiates);ServerOrClient;Any;M;passed;SHIP-TS-TERM-01;
+TC_SHIP_AM_001;SHIP;AM;Verify SHIP ID in access methods response;ServerOrClient;Any;M;passed;SHIP-TS-DATA-01;
+TC_SHIP_AMDATA_001;SHIP;AMDATA;Parallel processing of SME "data" while answering an "access methods" request;ServerOrClient;Any;M;passed;SHIP-IG-02;
+TC_SHIP_AMDATA_002;SHIP;AMDATA;Parallel processing of SME "data" while awaiting a delayed "access methods" response;ServerOrClient;Any;M;passed;SHIP-IG-02;
+TC_SHIP_AMDATA_003;SHIP;AMDATA;Parallel processing of SME "access methods" while awaiting a delayed "data" response;ServerOrClient;Any;M;passed;SHIP-IG-03;
+TC_SHIP_AMDATA_004;SHIP;AMDATA;Verify that a DUT declaring PAR_queryAccessMethods = "no" sends no "access methods request";ServerOrClient;Any;M;not applicable;;the device declares PAR_queryAccessMethods = "yes" and is expected to ask
+TC_SPINE_COMP_001;SPINE;COMP;Reject unknown Function;Special;Any;M;passed;SPINE-TS-COMP-01;
+TC_SPINE_COMP_002;SPINE;COMP;Forward version compatibility;Special;Any;M;passed;SPINE-TS-COMP-02;
+TC_SPINE_COMP_003;SPINE;COMP;Ignore unknown Elements;Special;Any;M;passed;SPINE-TS-COMP-03;
+TC_SPINE_COMP_004;SPINE;COMP;Ignore invalid replies;Special;Any;M;passed;SPINE-TS-COMP-04;
+TC_SPINE_COMP_005;SPINE;COMP;Strict version formatting;Special;Any;M;passed;SPINE-TS-COMP-05;
+TC_SPINE_COMP_006;SPINE;COMP;Version format variations;Special;Any;M;warning;SPINE-TS-COMP-06;passed, with a behaviour the specification tolerates only for now
+TC_SPINE_DATA_001;SPINE;DATA;Ascending message counters;Special;Any;M;passed;SPINE-TS-DATA-01;
+TC_SPINE_DATA_002;SPINE;DATA;Allow skipped counters;Special;Any;M;passed;SPINE-TS-DATA-02;
+TC_SPINE_DATA_003;SPINE;DATA;Handle message counter reset or overflow;Special;Any;M;passed;SPINE-TS-DATA-03;
+TC_SPINE_DATA_004;SPINE;DATA;Match reference counter;Special;Any;M;passed;SPINE-TS-DATA-04;
+TC_SPINE_DATA_005;SPINE;DATA;Acknowledge notify datagrams;Special;Any;M;passed;SPINE-TS-DATA-05;
+TC_SPINE_DATA_006;SPINE;DATA;No response to results;Special;Any;M;passed;SPINE-TS-DATA-06;
+TC_SPINE_DATA_007;SPINE;DATA;Ignore ackRequest in read;Special;Any;M;passed;SPINE-TS-DATA-07;
+TC_SPINE_DATA_008;SPINE;DATA;No response to results (DUT initiated);Special;Any;M;passed;SPINE-TS-DATA-06;
+TC_SPINE_FC_001;SPINE;FC;Reject non-primary destinations;Special;Any;M;passed;SPINE-TS-FC-01;
+TC_SPINE_DDISC_001;SPINE;DDISC;Initial discovery of unknown partner;Special;Any;M;passed;SPINE-TS-DD-01;
+TC_SPINE_DDISC_002;SPINE;DDISC;Disconnect uncommunicative partner;Special;Any;M;not applicable;SPINE-TS-DD-02;the device declares PAR_initialTimeoutSupported = "no", Annex D.3 leaves this optional
+TC_SPINE_BIND_001;SPINE;BIND;Deny NodeManagement binding;Special;Any;M;passed;SPINE-TS-BIND-01;
+TC_SPINE_BIND_002;SPINE;BIND;Reject unbound write;Server;CS;M;passed;SPINE-TS-BIND-02;
+TC_SPINE_SUBS_001;SPINE;SUBS;Accept NodeManagement subscription;Special;Any;M;passed;SPINE-TS-SUBS-01;
+TC_SPINE_SUBS_002;SPINE;SUBS;Idempotent subscription deletion;Special;Any;M;passed;SPINE-TS-SUBS-02;
+TC_SPINE_ENTITY_001;SPINE;ENTITY;Dynamic server discovery;Client;EG;M;passed;SPINE-TS-ES-01;
+TC_SPINE_ENTITY_002;SPINE;ENTITY;Dynamic server subscription;Client;CS;M;passed;SPINE-TS-ES-02;
+TC_SPINE_RTS_001;SPINE;RTS;Tolerate arbitrary client Feature types;Server;CS;M;passed;SPINE-TS-RT-01 SPINE-TS-DATA-05;
+TC_SPINE_RTS_002;SPINE;RTS;Tolerate unknown Feature types;Server;CS;M;passed;SPINE-TS-COMP-02;
+TC_SPINE_RTS_003;SPINE;RTS;Deduce client address from client's binding request;Server;CS;M;passed;SPINE-TS-RT-02;
+TC_SPINE_RTS_004;SPINE;RTS;Ignore unknown payload Elements;Server;CS;M;passed;SPINE-TS-COMP-02 SPINE-TS-COMP-03;
+TC_SPINE_RTS_005;SPINE;RTS;Apply RFE merge logic ScaledNumberType;Server;CS;M;passed;SPINE-TS-RT-03;
+TC_SPINE_RTC_001;SPINE;RTC;Ignore extra server Elements;Client;EG;M;passed;SPINE-TS-COMP-03;
+TC_SPINE_RTC_002;SPINE;RTC;Ignore unknown server Elements;Client;EG;M;passed;SPINE-TS-COMP-02 SPINE-TS-COMP-03;
+TC_SPINE_RTC_003;SPINE;RTC;Ignore useCaseAvailable flag;Client;EG;M;passed;SPINE-TS-UCD-01;
