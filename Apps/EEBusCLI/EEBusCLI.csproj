@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>cloud.charging.open.protocols.EEBus.CLI</RootNamespace>
+    <AssemblyName>eebus</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\EEBusSimulations\EEBusSimulations.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,107 @@
+name: Build and test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Not "submodules: recursive": libs/devices contains a path with a colon
+      # (vaillant/arotherm-vwl-75:6a), which cannot be checked out on Windows.
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 \
+            libs/Styx libs/Hermod libs/WWCP_EEBus \
+            libs/ship-go libs/spine-go libs/eebus-go
+
+      - name: Checkout device recordings (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: git submodule update --init --depth 1 libs/devices
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore EEBusConformanceTests.sln
+
+      - name: Build
+        run: dotnet build EEBusConformanceTests.sln --no-restore --configuration Release
+
+      # The protocol stack itself lives in the WWCP_EEBus submodule and brings its own tests.
+      # "LocalNetwork" is excluded: those tests need multicast and a free port 5353,
+      # which a CI runner does not reliably provide.
+      - name: Build and test the EEBus protocol stack
+        working-directory: libs/WWCP_EEBus
+        run: |
+          dotnet build WWCP_EEBus.sln --configuration Release
+          dotnet test  WWCP_EEBus.sln --no-build --configuration Release --filter "TestCategory!=LocalNetwork"
+
+      - name: Test
+        run: dotnet test EEBusConformanceTests.sln --no-build --configuration Release --filter "TestCategory!=Interop"
+
+
+  interop:
+    name: Interoperability against the Go reference implementations
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 \
+            libs/Styx libs/Hermod libs/WWCP_EEBus \
+            libs/ship-go libs/spine-go libs/eebus-go libs/devices
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # ship-go/spine-go/eebus-go require Go 1.24 (spine-go and eebus-go even pin
+      # "toolchain go1.24.4"), so anything older would force a toolchain download.
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: |
+            libs/ship-go/go.sum
+            libs/spine-go/go.sum
+            libs/eebus-go/go.sum
+
+      - name: Build the Go reference implementations
+        shell: bash
+        run: |
+          for module in ship-go spine-go eebus-go; do
+            echo "::group::building $module"
+            (cd "libs/$module" && go build ./...)
+            echo "::endgroup::"
+          done
+
+      - name: Build
+        run: dotnet build EEBusConformanceTests.sln --configuration Release
+
+      - name: Interoperability tests
+        run: dotnet test EEBusConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop"
