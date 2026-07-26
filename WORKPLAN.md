@@ -518,8 +518,9 @@ An inventory of `libs/WWCP_EEBUS` (2026-07-26) and the refactoring tasks:
   SKI, trust is decided by the hello phase and the trust store".
 * **Note for Windows:** `CipherSuitesPolicy` is **not** supported by SChannel → fall back to
   the operating system defaults on Windows (the GCM suite is available there); on Linux set
-  both suites explicitly. Record the risk and the fallback (BouncyCastle TLS) in
-  `docs/adr/0001-tls-cipher-suites.md`.
+  both suites explicitly — **together with the TLS 1.3 suites**, otherwise .NET rejects every
+  connection as long as TLS 1.3 is enabled. Record the risk and the fallback (BouncyCastle
+  TLS) in `docs/adr/0001-tls-cipher-suites.md`.
 * **Tests:** a certificate roundtrip, the SKI of known certificates (fixtures from the ship-go
   tests), a TLS handshake C# ↔ C# with a mandatory client certificate; cipher suite
   verification by inspecting the `SslStream`.

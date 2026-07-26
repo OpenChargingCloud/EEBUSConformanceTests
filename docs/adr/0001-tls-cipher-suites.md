@@ -23,6 +23,13 @@ certificate whose private key is *ephemeral* — as produced by
 `CertificateRequest.CreateSelfSigned(...)` — and aborts the handshake with
 "Received an unexpected EOF or 0 bytes from the transport stream".
 
+A third one only shows up on Linux: TLS 1.3 moved its cipher suites into a namespace of
+their own, so a policy holding just the two suites of chapter 9.1 allows *no* TLS 1.3
+suite at all. .NET does not react to this by simply not negotiating TLS 1.3 — it refuses
+the connection with `The 'RequireEncryption' encryption policy is not supported by this
+installation of OpenSSL` as soon as `EnabledSslProtocols` names TLS 1.3 explicitly. On
+Windows the policy is `null`, so the combination went unnoticed until the Linux CI job ran.
+
 ## Decision
 
 1. `SHIPTLS.CipherSuites` lists both suites of the specification. The policy is built
@@ -32,6 +39,11 @@ certificate whose private key is *ephemeral* — as produced by
    assert the expected behaviour per platform instead of hiding the difference.
 2. TLS 1.2 and 1.3 are both enabled. SHIP 1.0.1 mandates 1.2; allowing 1.3 in addition
    matches the reference implementation and avoids rejecting newer partners.
+   The policy therefore has to be the *union* of chapter 9.1 and `SHIPTLS.TLS13CipherSuites`
+   — pinning the SHIP suites restricts TLS 1.2, it must not disable TLS 1.3. The Go
+   reference implementation arrives at the same result by construction, because Go applies
+   `tls.Config.CipherSuites` to TLS 1.2 and below only. `SHIPTLS.CipherSuites` keeps
+   quoting the specification alone; the union exists only inside the policy.
 3. `SHIPCertificates.GenerateCertificate(...)` round-trips the certificate through
    PKCS#12 on Windows, so that the resulting private key is usable by SChannel.
 4. Certificate validation never rejects on PKI grounds (expired, unknown issuer, no
@@ -47,6 +59,9 @@ certificate whose private key is *ephemeral* — as produced by
   system wide. Should this occur in the field, the fallback is a BouncyCastle-based TLS
   layer; Hermod already carries BouncyCastle.
 * Conformance test runs have to record the platform: a cipher suite result from Windows
-  says something different than one from Linux.
+  says something different than one from Linux. The same asymmetry hides bugs — the CI
+  matrix has to keep running both, a green Windows job proves nothing about the policy.
+* Every TLS version added to `SHIPTLS.Protocols` has to bring its suites into the policy.
+  `CipherSuitesPolicy_CoversEveryEnabledProtocol` checks that pairing.
 * The interoperability suite runs on Linux (or WSL), where the cipher suites can be
   pinned exactly as the specification demands.
