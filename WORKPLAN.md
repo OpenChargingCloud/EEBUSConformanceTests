@@ -46,9 +46,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/4** | ✅ done — **LPP and MGCP** (`WWCP_EEBUS_UseCases/LimitationOfPower/`, `Monitoring/`, `LPP/`, `MGCP/`): both are a use case we already had, pointed elsewhere, so both were **generalised rather than copied** — LPC/LPP now share one profile-driven state machine and pair of actors, MPC/MGCP one profile-driven measuring and watching side. Doing so made "two use cases on one entity" normal (a battery is limited in both directions; a grid meter is regularly an MPC monitored unit too) and turned up **three places which assumed they were alone** on a shared feature, each now pinned by a test. ADR `docs/adr/0006-one-feature-many-use-cases.md`. 16 new tests, 97 in the use case suite |
 | **WP09/5** | ✅ done — **EVSECC, EVCC, EVCEM and EVSOC** (`WWCP_EEBUS_UseCases/Commissioning/`, `EVSECC/`, `EVCC/`, `EVCEM/`, `EVSOC/`): the commissioning pair got a shared profile-driven layer for the two facts every commissioning use case carries (manufacturer data, operating state), the measuring pair became two more `MonitoringProfile`s. EVSOC is where the monitoring shape stops — **not every measured quantity is on a wire**, so a state of charge gets no phase, no electrical connection parameter description and no commodity type. This is also the work package where one entity playing four server actors becomes the normal case, which turned up a **defect in OPEV from WP09/2**: it replaced three shared list functions wholesale and deleted the charging power limits of EVCC. ADR `docs/adr/0007-monitoring-is-not-always-electrical.md`, findings U1–U3. 42 new tests, 139 in the use case suite |
 | **WP09/6** | ✅ done — **OSCEV and CEVC** (`WWCP_EEBUS_UseCases/ChargingCurrent/`, `OSCEV/`, `CEVC/`). OSCEV is OPEV with a **recommendation** instead of an obligation, so the two now share a profile-driven pair of actors; the one real difference is behaviour and it follows from that word — a car which loses its energy guard falls back to a safe current, a car which loses its energy manager just stops taking the advice. CEVC is the largest use case in the family: **three actors**, the TimeSeries and IncentiveTable models, and `updateRequired` — the only way a SPINE server can ask anybody for anything. It also broke an assumption the use case framework had held since WP08: **a partner may play two actors of one use case**, and the second entry was overwriting the first. ADR `docs/adr/0008-one-partner-many-actors.md`. 25 new tests, 164 in the use case suite |
-| WP09/7–WP14 | open (order see § 10) |
+| **WP09/7** | ✅ done — **EVCS** (`WWCP_EEBUS_UseCases/EVCS/`), and with it **WP09 is complete**: all thirteen use cases of the plan on both sides. The only one with no Go reference, so purely specification driven — which was the point of doing it. Two things in it are the reverse of what one expects and both are tests now: the **EVSE is the server** and the broker writes into it, and the positions of a charging summary are **percentages of the total** rather than amounts of their own. The generated model had every type and value the document names, so the specification-to-code pipeline held; the one thing needing judgement rather than transcription was that percentage reading. 11 new tests, 175 in the use case suite |
+| WP10–WP14 | open (order see § 10) |
 
-**Test inventory:** 119 SHIP + 126 SPINE + 164 use case tests within the stack (4 of them marked
+**Test inventory:** 119 SHIP + 126 SPINE + 175 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -735,7 +736,24 @@ arrived with a `msgCounterReference` and could not be handled stranded its calle
 ever timed out. A partner which never answers must not be able to stop this device, and for a
 bench "no answer" is a result which has to be reportable.
 
-### WP09 — the use cases *(L in total; S–M each, highly parallelisable; needs WP08)*
+### WP09 — the use cases *(L in total; S–M each, highly parallelisable; needs WP08)* ✅ **done**
+
+> **Result:** thirteen use cases on **both** sides — LPC, LPP, MPC, MGCP, OPEV, OSCEV, EVSECC,
+> EVCC, EVCEM, EVSOC, CEVC and EVCS — in 175 tests, every one of them over a loopback pair of
+> devices which records every datagram. Four ADRs came out of it (0005 to 0008) and the recurring
+> lesson behind three of them is one sentence: **nothing in SPINE is exclusive.** Not a feature on
+> an entity, not an identifier in a list, not an actor at a partner. Every time a work package put
+> a second thing where the code assumed one, it found a defect that would have been an
+> interoperability bug on real hardware.
+>
+> Where a use case is another use case pointed somewhere else, it is a **profile** rather than a
+> copy: `LimitationOfPower/` carries LPC and LPP, `Monitoring/` carries MPC, MGCP, EVCEM and EVSOC,
+> `ChargingCurrent/` carries OPEV and OSCEV, `Commissioning/` carries EVSECC and EVCC. The
+> reference implementation duplicates all four pairs; here the state machines, the joins and the
+> identifier arithmetic exist once and are tested once, against every profile.
+>
+> Still open and deliberately so: the §14a details of the LPC implementation guide V1.1.0, and
+> validating any of it against real Go peers, which is WP12.
 
 In order of priority:
 
@@ -890,9 +908,36 @@ In order of priority:
    second entry was overwriting the first — so the car saw half its scenarios, and which half
    depended on the order the partner listed its actors in. Now unioned per entity. ADR
    `docs/adr/0008-one-partner-many-actors.md`.
-7. **EVCS** (EV charging summary, specification V1.0.1; optional): the only use case without a
-   Go reference — purely specification driven (the Bill feature), and therefore a good stress
-   test of our specification-to-code pipeline.
+7. **EVCS** — ✅ **done**, and with it **WP09 is complete**.
+   <br>The smallest use case in the family - one scenario, one feature, three functions - and the
+   only one with **no Go reference implementation at all**, which is what made it worth doing: it
+   is the one item where the specification was the only source and there was nothing proven in
+   certification to check against.
+   <br>It is also the only e-mobility use case which answers **what just happened** rather than what
+   should happen next. Everything else is a limit, a recommendation or a plan; this summarises a
+   finished session: how much energy, what it cost, and how much of it came from the roof rather
+   than the grid. Section 2.1 is careful about what that is for - "should not be used for billing
+   purposes, as it may contain estimated values".
+   <br>Two things about it are the opposite of what one expects and both are now tests. **The
+   direction is reversed**: the energy broker knows the prices, but the **EVSE** hosts the Bill
+   feature and the broker writes into it - because the charging station is where a person is
+   standing. And **the positions are percentages, not amounts**: the total is in watt hours and
+   money, and the split between grid and self-produced electricity is `valuePercentage` and
+   `costPercentage` of that total (Table 8). A reader which took them for absolute values would
+   report a 20 kWh session as having drawn 65 watt hours from the grid. The two percentages of a
+   pair are also different numbers, and that difference is the entire reason a customer is shown
+   this: a third of the kilowatt hours came from the roof and only a fifth of the money did.
+   <br>The EVSE asks for the summary the same way a CEVC car asks for a power curve - `updateRequired`
+   on the description, because a SPINE server answers rather than requests ([EVCS-009]). It has no
+   heartbeat and no error state scenarios of its own; it learns that a session ended from EVCC
+   scenario 8 (§ 2.4.1.2).
+   <br>**On the pipeline question the item was chosen to answer:** it held. Every type, enumeration
+   value and identifier the document names existed already in the generated model - `Bill`,
+   `billType: chargingSummary`, `positionType: gridElectricEnergy`/`selfProducedElectricEnergy`,
+   `costType: absolutePrice` - because WP06 generated from the 76 official XSDs rather than from the
+   Go reference. Nothing had to be invented and nothing was missing. The only thing which needed
+   judgement rather than transcription was the percentage-versus-amount reading above, and that is
+   a question no amount of code generation answers.
 * **Tests per use case:** scenario walkthroughs over an in-memory device pair; data flow
   assertions (e.g. LPC: write a limit → a notify at the energy guard; a heartbeat failure → a
   failsafe event).
