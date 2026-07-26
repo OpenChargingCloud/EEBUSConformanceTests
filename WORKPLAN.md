@@ -42,9 +42,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP08** | ✅ done — the **use case framework** in `WWCP_EEBUS_UseCases/`: `UseCaseNames`/`UseCaseActors` (SPINE leaves both enumerations deliberately empty), `UseCaseVersion` with the discovery rules of section 3.1.2 which every use case specification repeats, `AUseCase` (registration, availability, partner discovery, scenario matching against the partner's server features, events) and `UseCaseFeature` — one helper instead of the nine typed ones of eebus-go. The rules of `EEBus_UC_IG_GeneralGuidelines_V1.0.0` are applied where they are code and written down in the ADR where they are conformance checks for WP11. ADR `docs/adr/0005-use-case-framework.md`, finding S8 |
 | **WP09/1** | ✅ done — **LPC on both sides** (`WWCP_EEBUS_UseCases/LPC/`): the energy guard and the controllable system, all four scenarios, and the **state machine of section 2.3** which eebus-go leaves to the application. 28 tests: the twelve transitions and Table 1 against a fake clock, and the whole use case over the wire from discovery through binding to the failsafe fallback |
 | **WP09/2** | ✅ done — **OPEV on both sides** (`WWCP_EEBUS_UseCases/OPEV/`), including the **EV side, which eebus-go does not have**: the specification's chapter 3 behaviour of falling back to a safe current when the energy guard goes quiet ([OPEV-005], four seconds) or announces a failure ([OPEV-007]). 12 tests |
-| WP09/3–WP14 | open (order see § 10) |
+| **WP09/3** | ✅ done — **MPC on both sides** (`WWCP_EEBUS_UseCases/MPC/`): the five scenarios (power, energy, current, voltage, frequency), of which only the first is mandatory. The plainest use case and therefore the one where all the work is in the **descriptions** - a measured value is a number under an identifier, and what it means comes from two descriptions in two features. 11 tests |
+| WP09/4–WP14 | open (order see § 10) |
 
-**Test inventory:** 118 SHIP + 125 SPINE + 70 use case tests within the stack (4 of them marked
+**Test inventory:** 118 SHIP + 125 SPINE + 81 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -768,7 +769,20 @@ In order of priority:
    chain has to fit inside that.
    <br>Still open: validating against `eebus-go/examples/evse` and `hems` belongs to WP12
    (interoperability), not here.
-3. **MPC** (`mu/mpc` + `ma/mpc`).
+3. **MPC** — ✅ **done**. `MPCMonitoredUnit`, `MPCMonitoringAppliance` and
+   `MonitoringOfPowerConsumption`.
+   <br>Nothing is written, nothing has a state, nothing falls back, so all of the difficulty is in
+   the descriptions: a measured value arrives as a number under an identifier, the measurement
+   description says what kind of quantity it is and in which unit, and the **electrical connection
+   parameter description** says which phase it is on. An appliance which reads only one of the two
+   is reading numbers it cannot name - which is a test of its own here, because it looks like data.
+   <br>Two things a careless client gets wrong and this one does not: a "phase" of `abc` is the sum
+   rather than a wire, and a measurement whose `valueType` is a minimum or an average is a
+   different statement about the same quantity - taking the first entry found would report the
+   minimum of the day as the current power.
+   <br>Only scenario 1 is mandatory: a meter which knows nothing but its total active power
+   implements this use case completely, and the appliance has to be able to tell that from a meter
+   which forgot to announce the rest.
 4. **LPP**, **MGCP**.
 5. **EVSECC**, **EVCC**, **EVCEM**, **EVSOC** (the specifications V1.0.1 respectively EVSOC
    V1.0.0 RC1 are available in `docs/specs/` — take the scenario and feature tables from there).
