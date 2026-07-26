@@ -1,0 +1,13 @@
+# EEBus specification downloads (EEBus Initiative license — do not redistribute)
+docs/specs/
+
+# .NET build artifacts
+bin/
+obj/
+TestResults/
+*.user
+
+# IDE
+.vs/
+.idea/
+.vscode/

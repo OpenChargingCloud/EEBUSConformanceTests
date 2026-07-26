@@ -1,0 +1,25 @@
+[submodule "libs/Hermod"]
+	path = libs/Hermod
+	url = https://github.com/Vanaheimr/Hermod.git
+[submodule "libs/Styx"]
+	path = libs/Styx
+	url = https://github.com/Vanaheimr/Styx.git
+[submodule "libs/ship-go"]
+	path = libs/ship-go
+	url = https://github.com/enbility/ship-go.git
+[submodule "libs/spine-go"]
+	path = libs/spine-go
+	url = https://github.com/enbility/spine-go.git
+[submodule "libs/eebus-go"]
+	path = libs/eebus-go
+	url = https://github.com/enbility/eebus-go.git
+[submodule "libs/devices-app"]
+	path = libs/devices-app
+	url = https://github.com/enbility/devices-app.git
+[submodule "libs/devices"]
+	path = libs/devices
+	url = https://github.com/enbility/devices.git
+	ignore = dirty
+[submodule "libs/WWCP_EEBus"]
+	path = libs/WWCP_EEBus
+	url = https://github.com/OpenChargingCloud/WWCP_EEBus.git
