@@ -44,9 +44,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/2** | ✅ done — **OPEV on both sides** (`WWCP_EEBUS_UseCases/OPEV/`), including the **EV side, which eebus-go does not have**: the specification's chapter 3 behaviour of falling back to a safe current when the energy guard goes quiet ([OPEV-005], four seconds) or announces a failure ([OPEV-007]). 12 tests |
 | **WP09/3** | ✅ done — **MPC on both sides** (`WWCP_EEBUS_UseCases/MPC/`): the five scenarios (power, energy, current, voltage, frequency), of which only the first is mandatory. The plainest use case and therefore the one where all the work is in the **descriptions** - a measured value is a number under an identifier, and what it means comes from two descriptions in two features. 11 tests |
 | **WP09/4** | ✅ done — **LPP and MGCP** (`WWCP_EEBUS_UseCases/LimitationOfPower/`, `Monitoring/`, `LPP/`, `MGCP/`): both are a use case we already had, pointed elsewhere, so both were **generalised rather than copied** — LPC/LPP now share one profile-driven state machine and pair of actors, MPC/MGCP one profile-driven measuring and watching side. Doing so made "two use cases on one entity" normal (a battery is limited in both directions; a grid meter is regularly an MPC monitored unit too) and turned up **three places which assumed they were alone** on a shared feature, each now pinned by a test. ADR `docs/adr/0006-one-feature-many-use-cases.md`. 16 new tests, 97 in the use case suite |
-| WP09/5–WP14 | open (order see § 10) |
+| **WP09/5** | ✅ done — **EVSECC, EVCC, EVCEM and EVSOC** (`WWCP_EEBUS_UseCases/Commissioning/`, `EVSECC/`, `EVCC/`, `EVCEM/`, `EVSOC/`): the commissioning pair got a shared profile-driven layer for the two facts every commissioning use case carries (manufacturer data, operating state), the measuring pair became two more `MonitoringProfile`s. EVSOC is where the monitoring shape stops — **not every measured quantity is on a wire**, so a state of charge gets no phase, no electrical connection parameter description and no commodity type. This is also the work package where one entity playing four server actors becomes the normal case, which turned up a **defect in OPEV from WP09/2**: it replaced three shared list functions wholesale and deleted the charging power limits of EVCC. ADR `docs/adr/0007-monitoring-is-not-always-electrical.md`, findings U1–U3. 42 new tests, 139 in the use case suite |
+| WP09/6–WP14 | open (order see § 10) |
 
-**Test inventory:** 118 SHIP + 125 SPINE + 81 use case tests within the stack (4 of them marked
+**Test inventory:** 119 SHIP + 126 SPINE + 139 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -811,8 +812,47 @@ In order of priority:
    wrote their descriptions over whatever was there, with identifiers starting from one either way.
    None of it was reachable before this item, and all of it would have been a live interoperability
    bug on the first real battery. ADR `docs/adr/0006-one-feature-many-use-cases.md`.
-5. **EVSECC**, **EVCC**, **EVCEM**, **EVSOC** (the specifications V1.0.1 respectively EVSOC
-   V1.0.0 RC1 are available in `docs/specs/` — take the scenario and feature tables from there).
+5. **EVSECC**, **EVCC**, **EVCEM**, **EVSOC** — ✅ **done**. Two pairs, and each pair a shared
+   layer rather than four copies.
+   <br>**EVSECC** and **EVCC** are the same conversation about different devices: something is
+   plugged in, it says who made it and how it is doing, and an energy manager writes that down.
+   Those two facts are `UseCases/Commissioning/`; EVSECC is nothing else, EVCC is those plus what
+   only a car has (what it speaks, whether it charges asymmetrically, who it is, how hard it may
+   be charged). The scenario numbering of EVSECC is worth reading twice, because it is the other
+   way round from what one would guess: the manufacturer data is **recommended** and the error
+   state is **mandatory** — [EVSECC-020] is not a red dot, it says that while the station has
+   failed the numbers from the car behind it may no longer be valid either.
+   <br>Two of EVCC's eight scenarios have **no features at all**: "EV connected" and "EV
+   disconnected" are the EV entity appearing in and disappearing from the detailed discovery, and
+   both are mandatory on both sides. The framework already watches for exactly that, so
+   `IsConnected` is that watch given a name.
+   <br>**EVCEM** and **EVSOC** are two more `MonitoringProfile`s — and EVSOC is where that shape
+   stops. Its measurements are a state of charge, a state of health and a travel range: none of
+   them is on a phase, and Table 6 lists no electrical connection parameter description at all.
+   Publishing one anyway would put a claim on the wire the document does not make, so whether a
+   monitoring use case measures an electrical connection is now a fact on the profile. Two of the
+   three carry no `commodityType` either, for the same reason: the health of a battery is not a
+   measurement *of electricity*. And its scenario 2, the nominal capacity, is not a measurement
+   but a characteristic — the same "supported without being measured" door MGCP scenario 1 uses.
+   <br>EVCEM has a rule of its own worth keeping: **no scenario is mandatory, but silence is not
+   allowed**. "The EV SHALL support at least one of Scenario 1, 2 or 3, as all 3 scenarios measure
+   electricity and can be converted into each other."
+   <br>The part which mattered most was none of the four. A real car is **one entity playing four
+   or five server actors** — EVCC, EVCEM, EVSOC, OPEV, later OSCEV — with three of them writing to
+   the same electrical connection feature and two to the same measurement feature. That made the
+   subject of ADR 0006 the normal case and found a **defect in OPEV, written in WP09/2**: it
+   replaced the whole parameter description list, the whole permitted value set list and the whole
+   load control limit list, with identifiers hardcoded from zero, and assigned `WriteApproval`
+   instead of chaining it. On a car which also runs EVCC that deleted the minimum charging power
+   an energy manager needs in order not to throttle the car into stopping. `UseCaseIds.NextFree`
+   is now the one way any use case picks an identifier. ADR
+   `docs/adr/0007-monitoring-is-not-always-electrical.md`.
+   <br>Three findings, all of them about a use case specification rather than SPINE or SHIP, so
+   `docs/spec-deviations.md` gained a section for them: **U1** — the EVCC document spells the
+   communication standard key `communicationStandard` in its content tables and
+   `communicationsStandard` in its sequence diagram section, and the field has the plural; we send
+   the plural and accept both. **U2** — EVSOC names its client `MonitoringAppliance` and eebus-go
+   announces `CEM`. **U3** — the Porsche PMCC announces EVSECC as the actor `EV`.
 6. **OSCEV** (specification V1.0.1b), **CEVC** (specification V1.0.1; TimeSeries and
    IncentiveTable — the most demanding data models).
 7. **EVCS** (EV charging summary, specification V1.0.1; optional): the only use case without a

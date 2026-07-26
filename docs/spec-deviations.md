@@ -188,6 +188,75 @@ and spine-go asks for everything. Both get a valid answer; ours is smaller. Held
 
 ---
 
+## Use cases
+
+### U1 — the EVCC specification spells `communicationsStandard` two different ways
+
+*Found: 2026-07-26 (WP09/5),
+`EEBus_UC_TS_EVCommissioningAndConfiguration_V1.0.1.pdf`.*
+
+The document contradicts itself about the name of the configuration key which carries the
+standard a car speaks to a charging station — the key which decides whether half the e-mobility
+family is usable with that car at all:
+
+| Where | Spelling |
+|---|---|
+| Table 6, "Content of Function `deviceConfigurationKeyValueDescriptionListData` at Actor EV" | `communicationStandard` |
+| Table 13, the same content as a specialization at Actor CEM | `communicationStandard` |
+| Section 3.4.2.2, the selector a client is told to read the description with | `communicationsStandard` |
+
+The SPINE resource specification has `communicationsStandard`, and so do spine-go
+(`model/deviceconfiguration.go`) and eebus-go — so the field, which was built against the
+certified stack, has the plural.
+
+**What we do:** we **send** `communicationsStandard`, per the conflict rule. A client of ours
+**accepts either** (`EVCommissioningAndConfiguration.CommunicationStandardKeys`), because a car
+built literally from the content tables is a car which exists and a manager which did not
+recognise its key would conclude that it does not know what the car speaks — and therefore that
+no further use case is possible with it.
+
+**Consequence:** a conformance test for this key has to accept both spellings from a device under
+test and cannot treat either as a defect. Held by
+`EVCCTests.Scenario2_TheKeyIsSpelledTheWayTheResourceSpecificationSpellsIt` and
+`EVCCTests.Scenario2_ACarSpellingItTheOtherWayIsStillUnderstood`.
+
+---
+
+### U2 — EVSOC names its client actor `MonitoringAppliance`, eebus-go announces `CEM`
+
+*Found: 2026-07-26 (WP09/5), `EEBus_UC_TS_EVStateOfCharge_V1.0.0_RC1_public.pdf` section 3.2.2
+vs. `eebus-go/usecases/cem/evsoc/usecase.go`.*
+
+The specification says the watching side "SHALL be denoted as `MonitoringAppliance`" in the use
+case discovery. eebus-go registers it as `model.UseCaseActorTypeCEM`.
+
+This is the same shape as the OPEV actor question (specification `EnergyGuard`, eebus-go `CEM`),
+and note that it is *not* general: EVCEM's chapter 2 calls its client the "Energy Guard" but its
+section 3.2.2 says the wire says `CEM`, so there the two agree and there is nothing to reconcile.
+
+**What we do:** our EV accepts both actors, and our appliance announces `MonitoringAppliance` by
+default or `CEM` on request (`EVSOCMonitoringAppliance(AnnounceAsCEM: true)`). Carried by
+`MonitoringProfile.AlsoKnownAsClientActor`.
+
+**Consequence:** the conformance catalog checks the specification's name; the interoperability
+suite has to expect the other one. Held by `EVSOCTests.TheWatchingActorGoesByTwoNames`.
+
+---
+
+### U3 — the EVSECC actor of the Porsche PMCC is `EV`
+
+*Found: 2026-07-26 (WP09/5), noted in `eebus-go/usecases/cem/evsecc/usecase.go`
+("The Porsche PMCC devices use this actor for this use case incorrectly").*
+
+Not a contradiction between documents but between a document and a shipped product: the
+specification's actor for the EVSE commissioning use case is `EVSE`, and the PMCC announces `EV`.
+
+**What we do:** the same as eebus-go — accept it, and say so. `EVSECCEnergyManager` takes
+`StrictActor` for the case where a test wants the letter of the specification. Held by
+`EVSECCTests.AStationWhichAnnouncesTheWrongActorIsStillAccepted`.
+
+---
+
 ## SHIP
 
 ### H1 — the cipher suites of chapter 9.1 do not cover TLS 1.3
