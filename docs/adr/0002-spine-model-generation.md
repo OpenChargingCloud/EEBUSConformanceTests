@@ -91,6 +91,16 @@ gitignored), so the generator cannot run during a build.
     Differences are pinned in `SPINEModelTests.knownDeviations` with a reason, and a separate
     test fails when a pinned difference disappears, so the list cannot become a hiding place.
 
+11. **The generated types are `partial` and serialise opt-in** (WP06b). Everything the XSD
+    describes but cannot express — what a scaled number is worth, how an address reads, which
+    function a command carries — is written as a partial class under
+    `WWCP_EEBUS_SPINE/Additions/`, never by editing a generated file. Those additions are
+    ordinary public properties, and the JSON library would put every one of them into the next
+    datagram; `[JsonObject(MemberSerialization.OptIn)]` on every generated class is what keeps
+    a convenience property from becoming a field of the protocol. Two tests hold that in place:
+    one asserts the attribute on all 562 types, the other serialises a handful and compares the
+    exact JSON.
+
 ## Consequences
 
 * Changing the model means changing the generator, never the generated file. Every generated

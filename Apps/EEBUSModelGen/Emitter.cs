@@ -131,7 +131,14 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
                 builder.AppendLine( "    /// <summary>");
                 builder.AppendLine($"    /// {complexType.Name} (SPINE {Model.Version}, EEBus_SPINE_TS_{Resource}.xsd).");
                 builder.AppendLine( "    /// </summary>");
-                builder.AppendLine($"    public class {complexType.Name}");
+                // OptIn, so that only the properties declared here go over the
+                // wire. Everything the XSD cannot say - what a scaled number is
+                // worth, how an address reads, which function a command carries -
+                // is written next to this file as a partial class under
+                // WWCP_EEBUS_SPINE/Additions/, and none of it may end up in a
+                // datagram by accident.
+                builder.AppendLine( "    [JsonObject(MemberSerialization.OptIn)]");
+                builder.AppendLine($"    public partial class {complexType.Name}");
                 builder.AppendLine( "    {");
 
                 var order = 0;
@@ -738,9 +745,10 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
             builder.AppendLine($"//     Generated from the official SPINE {Model.Version} XSDs by Apps/EEBUSModelGen.");
             builder.AppendLine("//     Every change made here is lost the next time the generator runs.");
             builder.AppendLine("//");
-            builder.AppendLine("//     Where the XSD cannot express what is needed - the ISO 8601 types, the");
-            builder.AppendLine("//     identifiers of a data type - the answer belongs into the generator or");
-            builder.AppendLine("//     into a hand-written type below WWCP_EEBUS_SPINE/DataStructures/.");
+            builder.AppendLine("//     Where the XSD cannot express what is needed, the answer belongs into the");
+            builder.AppendLine("//     generator, into a hand-written type below WWCP_EEBUS_SPINE/DataStructures/,");
+            builder.AppendLine("//     or - for behaviour of a generated type - into its partial class below");
+            builder.AppendLine("//     WWCP_EEBUS_SPINE/Additions/.");
             builder.AppendLine("// </auto-generated>");
             builder.AppendLine();
 

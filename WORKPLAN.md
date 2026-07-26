@@ -36,9 +36,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP04** | ✅ done — `SHIPConnection` with all phases (CMI, hello including prolongation, protocol handshake, PIN, access methods, data, close); **every timer runs on a TimeProvider**, tests use `FakeTimeProvider` without a single real wait |
 | **WP05** | ✅ done — `SHIPNode` (connection registry, **double connection rule** SHIP 12.2.2 in both directions, pairing with approve/reject, `ISHIPTrustStore` as in-memory and JSON file variant, protection against connecting to itself) plus **`SHIPWebSocketEndpoint`**: Hermod WebSocket server and client with sub protocol `ship`, the TLS profile of WP02, SKI extraction from the TLS handshake. **End-to-end test green:** two nodes over real TLS WebSockets, from the TLS handshake to the SPINE datagram. |
 | **WP06a** | ✅ done — `Apps/EEBUSModelGen` generates the SPINE 1.3.0 model from the 76 official XSDs: **562 complex types, 81 enumerations, 142 functions, 2133 properties** in 121 checked-in files. Extensible string types in the `PredefinedStrings` style, the function registry `SPINEFunctions`, `[EEBUSFunction]`/`[EEBUSKey]` metadata, the ISO 8601 types keeping their text, `SPINEJSON` for the two JSON defaults which are wrong for this protocol. Checked against spine-go through a generated fixture **and** against its 23 recorded datagrams; ADR `docs/adr/0002-spine-model-generation.md`, three findings in `docs/spec-deviations.md` |
-| WP06b–WP14 | open (order see § 10) |
+| **WP06b** | ✅ done — the generated types are `partial` and serialise **opt-in**, so the hand-written semantics live under `WWCP_EEBUS_SPINE/Additions/` and cannot leak into a datagram: `ScaledNumberType.Value`/`FromValue` (decimal, exact), the address `ToString`/`Matches`/`Clone`, `TimePeriodType.Duration(TimeProvider)`, `PossibleOperationsType`, `CmdType`/`FilterType`/`CmdControlType` reaching every function through the generated `[EEBUSFunction]` metadata, the one-line datagram overview, the SPINE error numbers, `UseCaseInformationDataType` set/find/supports/remove |
+| WP06c–WP14 | open (order see § 10) |
 
-**Test inventory:** 117 SHIP + 20 SPINE + 1 use case tests within the stack (4 of them marked
+**Test inventory:** 117 SHIP + 41 SPINE + 1 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -612,11 +613,21 @@ XSDs"); spine-go serves as the oracle for the JSON field names and behavioural d
     `PRIMARYKEY_TAG_GUIDELINES.md`) as a generated registry
     (`[EEBUSFunction("loadControlLimitListData", …)]`).
   * The generated code is **checked in** (the generator runs on demand, not during the build).
-* **6b the core review (M):** sharpen the generated core parts manually (CommonDataTypes,
-  Datagram, CommandFrame, NodeManagement/NetworkManagement, subscription and binding
-  management, UseCaseInformation, Result, Version); hand-written code only where the XSD
-  semantics are not enough (e.g. `AbsoluteOrRelativeTimeType`, ISO 8601 durations, the
-  ScaledNumber helpers).
+* **6b the core review (M):** ✅ **done** — the generated types are `partial`, so the manual
+  sharpening happens **next to** them under `WWCP_EEBUS_SPINE/Additions/` and never by editing
+  generated code. Covered: CommonDataTypes (ScaledNumber, the three address types,
+  TimePeriod, PossibleOperations, ElementTag), CommandFrame (Cmd/Filter/CmdControl reaching
+  every function through the generated metadata), Datagram (the one-line overview), Result (the
+  error numbers, which the XSD declares as a bare `xs:unsignedInt`) and UseCaseInformation.
+  <br>The decision which came out of it: generated types serialise **opt-in**
+  (`[JsonObject(MemberSerialization.OptIn)]`). Additions are ordinary public properties, and
+  without that every one of them would have gone into the next datagram — `ScaledNumberType`
+  was serialising `"Value"` next to `"number"` and `"scale"` before it was noticed.
+  <br>Left for their own work packages, because they are logic rather than data:
+  NodeManagement/NetworkManagement detailed discovery belongs to **WP07b**, subscription and
+  binding management to **WP07c**. The names of the actors and use cases stay plain strings
+  here — which use cases exist is decided by the use case specifications, so the constants
+  belong to **WP08**.
 * **6c the update system (M):** implement partial reads and writes (selector matching, element
   filters, merging by primary keys) generically — the guides are
   `libs/spine-go/model/UPDATE_SYSTEM_GUIDE.md` and `PRIMARYKEY_TAG_GUIDELINES.md`; the 30
