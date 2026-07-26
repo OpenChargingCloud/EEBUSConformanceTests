@@ -45,9 +45,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/3** | ✅ done — **MPC on both sides** (`WWCP_EEBUS_UseCases/MPC/`): the five scenarios (power, energy, current, voltage, frequency), of which only the first is mandatory. The plainest use case and therefore the one where all the work is in the **descriptions** - a measured value is a number under an identifier, and what it means comes from two descriptions in two features. 11 tests |
 | **WP09/4** | ✅ done — **LPP and MGCP** (`WWCP_EEBUS_UseCases/LimitationOfPower/`, `Monitoring/`, `LPP/`, `MGCP/`): both are a use case we already had, pointed elsewhere, so both were **generalised rather than copied** — LPC/LPP now share one profile-driven state machine and pair of actors, MPC/MGCP one profile-driven measuring and watching side. Doing so made "two use cases on one entity" normal (a battery is limited in both directions; a grid meter is regularly an MPC monitored unit too) and turned up **three places which assumed they were alone** on a shared feature, each now pinned by a test. ADR `docs/adr/0006-one-feature-many-use-cases.md`. 16 new tests, 97 in the use case suite |
 | **WP09/5** | ✅ done — **EVSECC, EVCC, EVCEM and EVSOC** (`WWCP_EEBUS_UseCases/Commissioning/`, `EVSECC/`, `EVCC/`, `EVCEM/`, `EVSOC/`): the commissioning pair got a shared profile-driven layer for the two facts every commissioning use case carries (manufacturer data, operating state), the measuring pair became two more `MonitoringProfile`s. EVSOC is where the monitoring shape stops — **not every measured quantity is on a wire**, so a state of charge gets no phase, no electrical connection parameter description and no commodity type. This is also the work package where one entity playing four server actors becomes the normal case, which turned up a **defect in OPEV from WP09/2**: it replaced three shared list functions wholesale and deleted the charging power limits of EVCC. ADR `docs/adr/0007-monitoring-is-not-always-electrical.md`, findings U1–U3. 42 new tests, 139 in the use case suite |
-| WP09/6–WP14 | open (order see § 10) |
+| **WP09/6** | ✅ done — **OSCEV and CEVC** (`WWCP_EEBUS_UseCases/ChargingCurrent/`, `OSCEV/`, `CEVC/`). OSCEV is OPEV with a **recommendation** instead of an obligation, so the two now share a profile-driven pair of actors; the one real difference is behaviour and it follows from that word — a car which loses its energy guard falls back to a safe current, a car which loses its energy manager just stops taking the advice. CEVC is the largest use case in the family: **three actors**, the TimeSeries and IncentiveTable models, and `updateRequired` — the only way a SPINE server can ask anybody for anything. It also broke an assumption the use case framework had held since WP08: **a partner may play two actors of one use case**, and the second entry was overwriting the first. ADR `docs/adr/0008-one-partner-many-actors.md`. 25 new tests, 164 in the use case suite |
+| WP09/7–WP14 | open (order see § 10) |
 
-**Test inventory:** 119 SHIP + 126 SPINE + 139 use case tests within the stack (4 of them marked
+**Test inventory:** 119 SHIP + 126 SPINE + 164 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -853,8 +854,42 @@ In order of priority:
    `communicationsStandard` in its sequence diagram section, and the field has the plural; we send
    the plural and accept both. **U2** — EVSOC names its client `MonitoringAppliance` and eebus-go
    announces `CEM`. **U3** — the Porsche PMCC announces EVSECC as the actor `EV`.
-6. **OSCEV** (specification V1.0.1b), **CEVC** (specification V1.0.1; TimeSeries and
-   IncentiveTable — the most demanding data models).
+6. **OSCEV**, **CEVC** — ✅ **done**.
+   <br>**OSCEV** is the overload protection with two words changed: a `recommendation` instead of an
+   `obligation`, with the scope `selfConsumption` instead of `overloadProtection`. Same three
+   scenarios with the same numbers, same four second heartbeat — so the state, the phases and the
+   writing moved to `UseCases/ChargingCurrent/` and take a `ChargingCurrentProfile`, and `OPEV/` and
+   `OSCEV/` are the vocabulary.
+   <br>The one difference which is behaviour rather than vocabulary follows from that single word:
+   **what a car does when it stops trusting the other side.** Under the overload protection it falls
+   back to a safe current, because the fuse does not go away with the energy guard. Under the
+   self-consumption optimisation it stops applying the advice and charges as it otherwise would —
+   advice from a source which has gone quiet is not advice, and falling back to a low current there
+   would slow a charging session down because a photovoltaic forecast stopped arriving.
+   <br>[OSCEV-009] is its own mechanism and now the framework's: a car with a full battery "SHALL
+   stop to support this **scenario**" — not the use case, which it still implements, and scenarios 2
+   and 3 stay true because it is still watching whether the manager is there. `SetScenarioSupported`
+   on `AUseCase` does that.
+   <br>**CEVC** is the largest use case in the family — 105 pages, **three actors**, and the two most
+   demanding data models in SPINE. A car says how much energy it needs and by when (three numbers,
+   not one: enough for the hospital, enough for work, and everything the battery could take if the
+   energy happens to be free); an energy guard says how much power there will be over time; an energy
+   broker says what it will cost over time; and the car answers with a **plan**, a curve of what it
+   intends to draw when. That last curve is the point — everybody knows what will happen before it
+   happens, which is what the curtailment use cases never provide.
+   <br>All three curves live on the car's one TimeSeries feature and `timeSeriesType` tells them
+   apart; only the constraints curve is writeable, and our EV enforces that rather than merely
+   declaring it. The prices live on its IncentiveTable feature in the `simpleIncentiveTable` shape.
+   <br>The mechanism worth knowing is **updateRequired** ([CEVC-015], [CEVC-030]): the car is the
+   server of everything here and a SPINE server answers rather than requests, so when it needs a
+   fresh power limit curve it raises a flag on the description its clients are subscribed to. The
+   flag *is* the request, and it goes down by itself when the write arrives.
+   <br>CEVC also broke an assumption the use case framework had held since WP08: **a partner may
+   play two actors of one use case**. A home energy manager with a tariff subscription is the energy
+   guard *and* the energy broker on one entity, the use case data is grouped by actor, and the
+   second entry was overwriting the first — so the car saw half its scenarios, and which half
+   depended on the order the partner listed its actors in. Now unioned per entity. ADR
+   `docs/adr/0008-one-partner-many-actors.md`.
 7. **EVCS** (EV charging summary, specification V1.0.1; optional): the only use case without a
    Go reference — purely specification driven (the Bill feature), and therefore a good stress
    test of our specification-to-code pipeline.

@@ -257,6 +257,34 @@ specification's actor for the EVSE commissioning use case is `EVSE`, and the PMC
 
 ---
 
+### U4 — `incentiveTable` has no primary key, so it cannot be written partially
+
+*Found: 2026-07-26 (WP09/6), `EEBus_UC_TS_CoordinatedEVCharging_V1.0.1.pdf` Table 11 against
+SPINE 1.3.0, 5.3.4.1.*
+
+Not a contradiction between documents but a consequence worth writing down, because it changes what
+a client may send.
+
+The CEVC content tables mark every element of `incentiveTableData` with `\W` — a client writes all
+of it — and the tables are written in the same style as every other list function in the family,
+where a partial write addressed by the primary identifier is the norm and the general implementation
+guideline § 3.1 actively asks for one ("in cases where not all Elements are writeable by a client
+[…] the client SHALL use RFE for the write command").
+
+But `incentiveTable` is not that kind of list. Its identity sits *inside* the entry, in
+`tariff.tariffId`, and the entry itself carries no key — so SPINE 1.3.0, 5.3.4.1 allows "only the
+exchange of the complete list". Our update engine refuses a partial write of it, correctly, with
+exactly that sentence.
+
+**What we do:** `CEVCEnergyBroker.WriteIncentives` writes the incentive table **in full**, and says
+why in a comment. Everything else in the use case is written partially as usual.
+
+**Consequence:** a conformance test must not treat a full write of `incentiveTableData` as a
+violation of the guideline's "use RFE" rule, and must not expect a device to accept a partial one.
+Held by `CEVCTests.Scenario3_TheBrokerWritesPricesIntoTheTariffTheCarDescribed`.
+
+---
+
 ## SHIP
 
 ### H1 — the cipher suites of chapter 9.1 do not cover TLS 1.3
