@@ -51,6 +51,7 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
     /// <param name="Part">Which face of that function it carries.</param>
     /// <param name="IsKey">Whether this property is an identifier of its data type.</param>
     /// <param name="IsPrimaryKey">Whether this property is the primary identifier of its data type.</param>
+    /// <param name="IsWriteCheck">Whether this property states that its data type may be changed by a remote peer.</param>
     public sealed record SpineProperty(String        XmlName,
                                        String        CSharpName,
                                        String        CSharpType,
@@ -59,7 +60,8 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
                                        String?       Function       = null,
                                        FunctionPart  Part           = FunctionPart.None,
                                        Boolean       IsKey          = false,
-                                       Boolean       IsPrimaryKey   = false);
+                                       Boolean       IsPrimaryKey   = false,
+                                       Boolean       IsWriteCheck   = false);
 
 
     /// <summary>

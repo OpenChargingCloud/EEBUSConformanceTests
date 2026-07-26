@@ -37,9 +37,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP05** | ✅ done — `SHIPNode` (connection registry, **double connection rule** SHIP 12.2.2 in both directions, pairing with approve/reject, `ISHIPTrustStore` as in-memory and JSON file variant, protection against connecting to itself) plus **`SHIPWebSocketEndpoint`**: Hermod WebSocket server and client with sub protocol `ship`, the TLS profile of WP02, SKI extraction from the TLS handshake. **End-to-end test green:** two nodes over real TLS WebSockets, from the TLS handshake to the SPINE datagram. |
 | **WP06a** | ✅ done — `Apps/EEBUSModelGen` generates the SPINE 1.3.0 model from the 76 official XSDs: **562 complex types, 81 enumerations, 142 functions, 2133 properties** in 121 checked-in files. Extensible string types in the `PredefinedStrings` style, the function registry `SPINEFunctions`, `[EEBUSFunction]`/`[EEBUSKey]` metadata, the ISO 8601 types keeping their text, `SPINEJSON` for the two JSON defaults which are wrong for this protocol. Checked against spine-go through a generated fixture **and** against its 23 recorded datagrams; ADR `docs/adr/0002-spine-model-generation.md`, three findings in `docs/spec-deviations.md` |
 | **WP06b** | ✅ done — the generated types are `partial` and serialise **opt-in**, so the hand-written semantics live under `WWCP_EEBUS_SPINE/Additions/` and cannot leak into a datagram: `ScaledNumberType.Value`/`FromValue` (decimal, exact), the address `ToString`/`Matches`/`Clone`, `TimePeriodType.Duration(TimeProvider)`, `PossibleOperationsType`, `CmdType`/`FilterType`/`CmdControlType` reaching every function through the generated `[EEBUSFunction]` metadata, the one-line datagram overview, the SPINE error numbers, `UseCaseInformationDataType` set/find/supports/remove |
-| WP06c–WP14 | open (order see § 10) |
+| **WP06c** | ✅ done — the **restricted function exchange** (SPINE 1.3.0, § 5.3.4) as one generic engine over the model metadata, `WWCP_EEBUS_SPINE/Update/`: selector matching (including the exact-match rule for entity addresses), element filters which reach into nested elements, merging by identifiers, the "list item without identifier applies to all entries" rule, the write marks, and `SPINERead` for the answering half of a partial read. **All 29 official example datagrams of Annex A** are tests: read by the model, written back unchanged, put through the EEBUS JSON transformation of SHIP and back, and applied to a defined state. ADR `docs/adr/0003-spine-update-system.md`, four further findings (S4–S7) in `docs/spec-deviations.md` |
+| WP07–WP14 | open (order see § 10) |
 
-**Test inventory:** 117 SHIP + 41 SPINE + 1 use case tests within the stack (4 of them marked
+**Test inventory:** 117 SHIP + 78 SPINE + 1 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -599,7 +600,8 @@ XSDs"); spine-go serves as the oracle for the JSON field names and behavioural d
   silently typed as `String` before that was handled — the fixture comparison could not see it,
   the roundtrip over the recorded datagrams did), and `SPINEJSON` has to be used for reading and
   writing, because `DateParseHandling` mangles every timestamp and an empty list arrives as
-  `{}`. The remaining sub-packages 6b and 6c are unchanged.
+  `{}`. WP06c added one thing to the generator: the `eebus:"writecheck"` marks, which say
+  whether a remote peer may change a data type at all (S7 in `docs/spec-deviations.md`).
   <br>The original plan for 6a, for reference: a small tool `Apps/EEBUSModelGen` (in this repository,
   because the XSDs live here): it parses the XSDs (`System.Xml.Schema`/`XmlSchemaSet`) and
   generates one C# file per resource, following fixed rules:
@@ -628,11 +630,27 @@ XSDs"); spine-go serves as the oracle for the JSON field names and behavioural d
   binding management to **WP07c**. The names of the actors and use cases stay plain strings
   here — which use cases exist is decided by the use case specifications, so the constants
   belong to **WP08**.
-* **6c the update system (M):** implement partial reads and writes (selector matching, element
-  filters, merging by primary keys) generically — the guides are
-  `libs/spine-go/model/UPDATE_SYSTEM_GUIDE.md` and `PRIMARYKEY_TAG_GUIDELINES.md`; the 30
-  official `ExampleXMLs/RestrictedFunctionExchange/` datagrams serve as fixtures (transform the
-  XML into JSON using the rules of SHIP TS chapter 11 — a helper within the test code).
+* **6c the update system (M):** ✅ **done** — see `docs/adr/0003-spine-update-system.md`.
+  `WWCP_EEBUS_SPINE/Update/` holds one generic engine (`SPINETypeInfo`, `SPINESelectors`,
+  `SPINEElements`, `SPINEUpdate`, `SPINERead`) driven by the `[EEBUSKey]`, `[EEBUSWriteCheck]`
+  and `[EEBUSFunction]` marks of the generated model — no code per function, and none per list
+  type either (spine-go needs about forty hand-written `*_additions.go` files for that).
+  <br>What turned out to matter: the **specification decides here, not spine-go** (three
+  differences, S4–S6 in `docs/spec-deviations.md`, each held by a test) — the update semantics
+  are a statement about what a message *means*, and agreeing with somebody else's misreading is
+  not compatibility. A stated element **replaces** rather than merges, which the specification's
+  own `W-M-Y_1-1-02.xml` decides: it modifies a value of 105·10⁻¹ by sending nothing but
+  `<number>14</number>`, and § 5.3.4.7.1 lets the omitted scale fall back to its default, so the
+  answer is 14. And nothing is changed in place, which is what makes § 5.3.4.2 ("a server shall
+  only execute a restricted write if it can execute it completely") implementable at all.
+  <br>All 29 official `ExampleXMLs/RestrictedFunctionExchange/` datagrams are fixtures: read by
+  the model, written back unchanged, put through the EEBUS JSON transformation of SHIP TS
+  chapter 11 and back (which also gave WP01's `EEBUSJSON` 29 specification documents to prove
+  itself against), and applied to a defined state. `SPINEExampleXML` converts the XML **along
+  the model**, because an element which occurs once cannot be told from a list of one entry
+  without the schema. Two of the examples close a loop the specification opened itself: the
+  answer of `SPINERead` to the read `RD-P-Y_1-2-01` is compared with the reply `RY-P-Y_1-1-01`
+  which the specification ships for it.
 * **Tests:** a serialisation roundtrip of all golden files from `spine-go/spine/testdata` and
   `integration_tests/testdata`; a completeness check of the field names by reflection against a
   name list generated from the Go tags (a one-off helper script, its result checked in as a
@@ -834,7 +852,7 @@ key events) — which makes the simulations integration tests at the same time.
 | Use case family | Building blocks involved | Architectural consequence (to be considered now) |
 |---|---|---|
 | CEVC (charging planning) | TimeSeries, IncentiveTable, partial writes | keep the update and selector system generic (WP06/07), the time series semantics centrally on a TimeProvider; model `AbsoluteOrRelativeTime` properly |
-| OHPCF, the HVAC/DHW family (`ma/mdt`, the configuration use cases) | HVAC, SmartEnergyManagementPs, Setpoint | keep the feature and function registry open (no hard-coded use case list); the model part 6c can follow later |
+| OHPCF, the HVAC/DHW family (`ma/mdt`, the configuration use cases) | HVAC, SmartEnergyManagementPs, Setpoint | keep the feature and function registry open (no hard-coded use case list); the model (6a) and the update system (6c) already cover these classes, because neither of them knows a function by name |
 | ControlOfBattery / FlexibleLoad / FlexibleStartForWhiteGoods | PowerSequences, TaskManagement, ActuatorLevel | the most complex choreographies — not for version 1, but the sender and the state machine must not contain any use case assumptions |
 | MonitoringOfBattery/Inverter/PVString, VABD/VAPD | Measurement, ElectricalConnection | the same infrastructure as MPC → keep the feature helpers reusable (no use case specific special paths within Measurement) |
 | IncentiveTableBasedPowerConsumptionManagement | IncentiveTable at the grid connection point | like CEVC; the tariff data types early in the model (6b) |

@@ -131,30 +131,32 @@ var model  = reader.Read();
 
 #endregion
 
-#region The identifiers of the data types, from the Go reference implementation
+#region The identifiers and write marks of the data types, from the Go reference implementation
 
-var goTypes       = GoTags.Read(goDirectory);
-var unmatchedKeys = new List<String>();
+var goTypes      = GoTags.Read(goDirectory);
+var unmatchedGo  = new List<String>();
 
 if (goTypes.Count > 0)
 {
 
-    var keysByType = goTypes.
-                         Where(type => type.Fields.Any(field => field.IsKey)).
-                         ToDictionary(type => type.Name,
-                                      type => type.Fields.
-                                                  Where(field => field.IsKey).
-                                                  ToDictionary(field => field.JSONName,
-                                                               field => field.IsPrimary,
-                                                               StringComparer.Ordinal),
-                                      StringComparer.Ordinal);
+    // Everything the XSD cannot say: which properties identify a data type, and
+    // which one of them states that a remote peer may change it.
+    var markedByType = goTypes.
+                           Where(type => type.Fields.Any(field => field.IsKey || field.IsWriteCheck)).
+                           ToDictionary(type => type.Name,
+                                        type => type.Fields.
+                                                    Where(field => field.IsKey || field.IsWriteCheck).
+                                                    ToDictionary(field => field.JSONName,
+                                                                 field => field,
+                                                                 StringComparer.Ordinal),
+                                        StringComparer.Ordinal);
 
     var matched = new HashSet<String>(StringComparer.Ordinal);
 
     foreach (var complexType in model.Classes)
     {
 
-        if (!keysByType.TryGetValue(complexType.Name, out var keys))
+        if (!markedByType.TryGetValue(complexType.Name, out var marked))
             continue;
 
         for (var i = 0; i < complexType.Properties.Count; i++)
@@ -162,12 +164,13 @@ if (goTypes.Count > 0)
 
             var property = complexType.Properties[i];
 
-            if (!keys.TryGetValue(property.XmlName, out var isPrimary))
+            if (!marked.TryGetValue(property.XmlName, out var field))
                 continue;
 
             complexType.Properties[i] = property with {
-                                            IsKey         = true,
-                                            IsPrimaryKey  = isPrimary
+                                            IsKey         = field.IsKey,
+                                            IsPrimaryKey  = field.IsPrimary,
+                                            IsWriteCheck  = field.IsWriteCheck
                                         };
 
             matched.Add($"{complexType.Name}.{property.XmlName}");
@@ -176,9 +179,9 @@ if (goTypes.Count > 0)
 
     }
 
-    unmatchedKeys.AddRange(
-        keysByType.SelectMany(type => type.Value.Keys.Select(key => $"{type.Key}.{key}")).
-                   Where     (key  => !matched.Contains(key))
+    unmatchedGo.AddRange(
+        markedByType.SelectMany(type => type.Value.Keys.Select(key => $"{type.Key}.{key}")).
+                     Where     (key  => !matched.Contains(key))
     );
 
 }
@@ -195,13 +198,13 @@ Console.WriteLine($"SPINE {model.Version}");
 Console.WriteLine($"  {model.Classes.Count,4} complex types in {model.Classes.Select(c => c.Resource).Distinct().Count()} resources");
 Console.WriteLine($"  {model.StringTypes.Count,4} string types ({model.StringTypes.Count(s => s.IsExtensible)} of them extensible)");
 Console.WriteLine($"  {model.Functions.Count,4} functions");
-Console.WriteLine($"  {model.Classes.Sum(c => c.Properties.Count),4} properties, {model.Classes.Sum(c => c.Properties.Count(p => p.IsKey))} of them identifiers");
+Console.WriteLine($"  {model.Classes.Sum(c => c.Properties.Count),4} properties, {model.Classes.Sum(c => c.Properties.Count(p => p.IsKey))} of them identifiers, {model.Classes.Sum(c => c.Properties.Count(p => p.IsWriteCheck))} of them write marks");
 
 foreach (var warning in reader.Warnings)
     Console.WriteLine($"  warning: {warning}");
 
-foreach (var key in unmatchedKeys)
-    Console.WriteLine($"  warning: the Go model marks '{key}' as an identifier, but the XSDs do not know it.");
+foreach (var key in unmatchedGo)
+    Console.WriteLine($"  warning: the Go model marks '{key}', but the XSDs do not know it.");
 
 #endregion
 

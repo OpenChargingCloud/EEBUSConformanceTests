@@ -162,6 +162,9 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
                                                ? "        [EEBUSKey(IsPrimary: true)]"
                                                : "        [EEBUSKey]");
 
+                    if (property.IsWriteCheck)
+                        builder.AppendLine("        [EEBUSWriteCheck]");
+
                     if (property.Function is not null && property.Part != FunctionPart.None)
                         builder.AppendLine($"        [EEBUSFunction(\"{property.Function}\", EEBUSFunctionPart.{property.Part})]");
 

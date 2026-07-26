@@ -36,6 +36,10 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
     ///   by data type ("SHALL be set as PRIMARY IDENTIFIER") - and spine-go keeps
     ///   it in its struct tags, curated against the specification
     ///   (model/PRIMARYKEY_TAG_GUIDELINES.md).
+    /// * which property of a data type says whether a remote peer may change it.
+    ///   There are only three of them in all of SPINE ("isLimitChangeable",
+    ///   "isValueChangeable", "isSetpointChangeable"), the XSD makes them look
+    ///   like any other boolean, and the update system needs to know them.
     /// * a fixture of all JSON property names, checked in with the tests. That
     ///   turns "our model says the same as the reference implementation" into
     ///   something a test can assert without spine-go being present at all,
@@ -52,9 +56,11 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
         /// <param name="JSONName">The JSON property name.</param>
         /// <param name="IsKey">Whether it is an identifier of its data type.</param>
         /// <param name="IsPrimary">Whether it is the primary identifier.</param>
+        /// <param name="IsWriteCheck">Whether it states that its data type may be written by a remote peer.</param>
         public sealed record GoField(String   JSONName,
                                      Boolean  IsKey,
-                                     Boolean  IsPrimary);
+                                     Boolean  IsPrimary,
+                                     Boolean  IsWriteCheck);
 
         /// <summary>
         /// One data type of the Go reference implementation.
@@ -136,7 +142,8 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
                         new GoField(
                             json.Groups[1].Value,
                             tags.Contains("key",        StringComparer.Ordinal),
-                            tags.Contains("primarykey", StringComparer.Ordinal)
+                            tags.Contains("primarykey", StringComparer.Ordinal),
+                            tags.Contains("writecheck", StringComparer.Ordinal)
                         )
                     );
 
@@ -192,13 +199,21 @@ namespace cloud.charging.open.protocols.EEBUS.ModelGen
                 builder.AppendLine($"    \"{type.Name}\": {{");
                 builder.AppendLine($"      \"fields\": [ {String.Join(", ", type.Fields.Select(field => $"\"{field.JSONName}\""))} ]");
 
-                var keys = type.Fields.Where(field => field.IsKey).ToList();
+                var keys       = type.Fields.Where(field => field.IsKey).       ToList();
+                var writeCheck = type.Fields.Where(field => field.IsWriteCheck).ToList();
 
                 if (keys.Count > 0)
                 {
                     builder.Length -= Environment.NewLine.Length;
                     builder.AppendLine(",");
                     builder.AppendLine($"      \"keys\":   {{ {String.Join(", ", keys.Select(key => $"\"{key.JSONName}\": \"{(key.IsPrimary ? "primary" : "key")}\""))} }}");
+                }
+
+                if (writeCheck.Count > 0)
+                {
+                    builder.Length -= Environment.NewLine.Length;
+                    builder.AppendLine(",");
+                    builder.AppendLine($"      \"writeCheck\": [ {String.Join(", ", writeCheck.Select(field => $"\"{field.JSONName}\""))} ]");
                 }
 
                 builder.AppendLine($"    }}{(i < types.Count - 1 ? "," : "")}");

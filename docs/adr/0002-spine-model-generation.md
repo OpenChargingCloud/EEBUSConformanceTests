@@ -82,7 +82,11 @@ gitignored), so the generator cannot run during a build.
    `[EEBUSKey]` / `[EEBUSKey(IsPrimary: true)]`. Which property is the PRIMARY IDENTIFIER is
    stated in the text of the specification, data type by data type, and cannot be read from the
    XSD. spine-go has it curated against the specification and proven in certification; taking
-   the 97 entries from there is more trustworthy than typing them.
+   the 97 entries from there is more trustworthy than typing them. The same holds for the three
+   properties which decide whether a remote peer may change a data type at all —
+   `isLimitChangeable`, `isValueChangeable`, `isSetpointChangeable`: they look like any other
+   optional boolean in the XSD, come from the `eebus:"writecheck"` tags and are emitted as
+   `[EEBUSWriteCheck]` (WP06c, see `docs/adr/0003-spine-update-system.md`).
 
 10. **spine-go is the oracle, through a checked-in fixture.** The generator also writes
     `WWCP_EEBUS_SPINE_Tests/TestData/spine-go-model.json` — every data type of spine-go with its

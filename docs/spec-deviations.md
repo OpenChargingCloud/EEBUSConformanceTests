@@ -73,6 +73,91 @@ from an array which had no entries. An empty list therefore arrives as `{}`.
 **What we do:** `SPINEJSON` reads `{}` where a list is expected as the empty list, and writes
 the ordinary `[]`. A non-empty object where a list is expected stays an error.
 
+### S4 — a partial filter with selectors reaches one entry and one incoming item in spine-go
+
+*Found: 2026-07-26 (WP06c), spine-go `model/update.go`, `copyToSelectedData`.*
+
+SPINE 1.3.0, Table 6 describes the combination "partial filter with `<SELECTORS>`" as:
+
+> `<SELECTORS>` specify **locations** (specific identifiable list items) […] where `<FUNCTION>`
+> data is added or modified. `<FUNCTION>` SHALL NOT use identifiers.
+
+Locations, in the plural — the whole point of the combination is that a selector may name
+something which is not an identifier (5.3.4.7.1: "some `<SELECTORS>` also provide other search
+criteria") and then selects every entry which matches. spine-go applies the update to the first
+matching entry only (`break` after the first `SelectorMatch`) and reads only the first entry of
+the incoming list (`&newData[0]`).
+
+**What we do:** apply every stated item to every selected entry, and never append — the
+specification adds "`<SELECTORS>` SHALL match with already existing locations. Therefore, it is
+not possible to add new list entries to a list with identifiable list items with this
+combination."
+
+**Consequence:** where a partner selects several entries at once, spine-go changes one of them
+and we change all of them. None of the 29 official examples uses the combination, and no use
+case we implement sends it, so this is a difference to know about rather than a blocker. Held by
+`SPINEUpdateTests.SelectorsOfAPartialFilter_ChangeEveryEntryTheySelect`.
+
+### S5 — spine-go never adds a list entry on a write from a remote device
+
+*Found: 2026-07-26 (WP06c), spine-go `model/collection_operations.go`, `Merge`.*
+
+The merge of spine-go appends an entry which was not there before only when the update is a
+local one:
+
+```go
+if !exist && !remoteWrite {
+    // only local updates can append data
+    result = append(result, s2Item)
+}
+```
+
+SPINE 1.3.0 devotes an example to exactly the opposite: `EEBus_SPINE_Spec_Example_RFE_W-A-Y_1-1-01.xml`,
+listed in Table 21 under *"Classifier: write — List, list entry affected — Adding content"*, with
+the rules "identifier must not be present before" and "identifier must be declared in
+`<FUNCTION>`". A client adding a load control limit or a setpoint is the ordinary case of the
+LPC and OPEV use cases.
+
+**What we do:** follow the specification and add the entry. Whether a client may add anything at
+all is a question of the feature's `possibleOperations` and of the use case, one layer above the
+data model — this layer answers only what the data itself says (see S6).
+
+Held by `SPINERestrictedFunctionExchangeTests.Write_AddsANewListEntry`.
+
+### S6 — a refused partial write is applied in part by spine-go
+
+*Found: 2026-07-26 (WP06c), spine-go `model/update.go`.*
+
+SPINE 1.3.0, 5.3.4.2 closes the section on write combinations with:
+
+> In general, a write operation with restricted function exchange SHALL ONLY be executed by a
+> server if it can execute the received operation completely.
+
+spine-go changes every entry it is allowed to change, skips the ones it is not, and returns
+`false` afterwards; the caller in `spine/function_data.go` turns that into an error result, but
+the data has already been changed. A client which receives the error and reads the function back
+therefore finds a state which is neither the old one nor the one it asked for.
+
+**What we do:** work on a copy and keep it only when every part of the command was allowed. A
+refused write answers with the data exactly as it was.
+
+Held by `SPINEUpdateTests.ARefusedWrite_ChangesNothingAtAll`.
+
+### S7 — which property permits a remote write is not in the XSDs
+
+*Found: 2026-07-26 (WP06c).*
+
+Three data types of SPINE carry a boolean which decides whether another device may change
+them — `LoadControlLimitDataType.isLimitChangeable`, `DeviceConfigurationKeyValueDataType.isValueChangeable`
+and `SetpointDataType.isSetpointChangeable`. In the XSD they look like any other optional
+boolean; that they gate writes is stated in the text of the resource specification.
+
+**What we do:** the same as for the identifiers (ADR 0002, decision 9) — take them from the
+`eebus:"writecheck"` struct tags of spine-go, where they are curated and proven in
+certification, and emit them as `[EEBUSWriteCheck]`. The fixture carries them, so the model
+tests hold them in place without spine-go being present
+(`SPINEUpdateTests.TheWriteMarks_AreThoseOfTheGoReferenceImplementation`).
+
 ---
 
 ## SHIP
