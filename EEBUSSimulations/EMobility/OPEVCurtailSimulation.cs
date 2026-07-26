@@ -291,7 +291,7 @@ namespace cloud.charging.open.protocols.EEBUS.Simulations
                     (MeasurementOfElectricityDuringEVCharging.Current(ElectricalConnectionPhaseNameType.B), 16),
                     (MeasurementOfElectricityDuringEVCharging.Current(ElectricalConnectionPhaseNameType.C), 16),
                     (MeasurementOfElectricityDuringEVCharging.PowerTotal,                                   11000)
-                ], cancellationToken);
+                ], CancellationToken: cancellationToken);
 
                 Note("energy guard", "16 A per phase - the car charges at full power");
 
@@ -305,7 +305,7 @@ namespace cloud.charging.open.protocols.EEBUS.Simulations
                     (MeasurementOfElectricityDuringEVCharging.Current(ElectricalConnectionPhaseNameType.A), 10),
                     (MeasurementOfElectricityDuringEVCharging.Current(ElectricalConnectionPhaseNameType.B),  6),
                     (MeasurementOfElectricityDuringEVCharging.Current(ElectricalConnectionPhaseNameType.C),  6)
-                ], cancellationToken);
+                ], CancellationToken: cancellationToken);
 
                 Note("energy guard",
                      "curtailed to 10/6/6 A - asymmetrically, because the car said it can, " +

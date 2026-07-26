@@ -1,17 +1,17 @@
-﻿# EEBUS Conformance Tests
+﻿# EEBUS Conformance & Interoperability Tests
 
 Conformance and interoperability test suite for the **EEBUS** protocol family
 (SHIP and SPINE), defined by the [EEBUS Initiative e.V.](https://www.eebus.org).
 
 The suite is built around the official EEBUS test specifications and primarily tests
-[WWCP_EEBUS](https://github.com/OpenChargingCloud/WWCP_EEBUS) — the C# / .NET 10 EEBUS
-protocol stack developed alongside it — but it can be pointed at any EEBUS device or stack.
+[WWCP_EEBUS](https://github.com/OpenChargingCloud/WWCP_EEBUS) — the EEBUS protocol stack
+developed alongside it — but it can be pointed at any EEBUS device or stack.
 
 ## What is in here
 
 | Directory | Content |
 |-----------|---------|
-| `Tests/EEBUSConformance_Tests` | The conformance test catalog, following the official test case identifiers (`TC_SHIP_*`, `TC_SPINE_*`, use case tests). Own additional test cases use the prefix `TC_OCC_*`. |
+| `Tests/EEBUSConformance_Tests` | The conformance test catalog, following the official test case identifiers one to one: `TC_SHIP_*`, `TC_SPINE_*` from the two protocol test specifications, and `ATC_LPC_*`, `ATC_LPP_*`, `ATC_MGCP_*`, `ATC_MPC_*` from the four use case high level test specifications — 267 cases in all. Own additional test cases use the prefix `TC_OCC_*`. |
 | `Tests/EEBUSInterop_Tests` | Interoperability runs against other EEBUS implementations, started as external peers. |
 | `EEBUSSimulations` | Simulations of the common e-mobility use cases (LPC, MPC, OPEV, ...). |
 | `Apps/EEBUSCLI` | `eebus` command line runner for simulations and conformance runs. |

@@ -1,4 +1,4 @@
-# EEBUS in C# / .NET 10 — Work Plan
+# EEBUS Conformance & Interoperability Tests — Work Plan
 
 **Repository:** `OpenChargingCloud/EEBUSConformanceTests`
 **Status:** 2026-07-26 (after analysing ship-go, spine-go, eebus-go, Hermod, Styx, WWCP_EEBUS
@@ -9,10 +9,12 @@ and the official specifications in `docs/specs/`)
 
 ## 0. Mission and scope
 
-Build a complete **EEBUS protocol stack in C# (.NET 10)** — SHIP client/server and SPINE
-client/server — plus a **use case layer**, **example simulations for e-mobility**
-(LPC, MPC, OPEV, …) and a **conformance and interoperability test suite** (NUnit) which tests
-both our own stack and other implementations (ship-go, spine-go, eebus-go, EVCC, EEBUS.Net, …).
+Build the **EEBUS Conformance & Interoperability Tests**: a test bench which measures any EEBUS
+device against the official test specifications, together with the complete stack it needs in
+order to be able to ask the questions — SHIP client/server, SPINE client/server, a **use case
+layer**, and **example simulations for e-mobility** (LPC, MPC, OPEV, …). The suite (NUnit) runs
+against our own stack as a self test and against other implementations (ship-go, spine-go,
+eebus-go, EVCC, EEBUS.Net, …) as an interoperability test.
 
 **Two repository model (decision by Achim, 2026-07-26):**
 
@@ -49,11 +51,11 @@ approval); afterwards the submodule pointer is updated here.
 | **WP09/7** | ✅ done — **EVCS** (`WWCP_EEBUS_UseCases/EVCS/`), and with it **WP09 is complete**: all thirteen use cases of the plan on both sides. The only one with no Go reference, so purely specification driven — which was the point of doing it. Two things in it are the reverse of what one expects and both are tests now: the **EVSE is the server** and the broker writes into it, and the positions of a charging summary are **percentages of the total** rather than amounts of their own. The generated model had every type and value the document names, so the specification-to-code pipeline held; the one thing needing judgement rather than transcription was that percentage reading. 11 new tests, 175 in the use case suite |
 | **WP10** | ✅ done — **the e-mobility simulations** (`EEBUSSimulations/`, `eebus sim <name>`): the five scenarios of § 5 on one `FakeTimeProvider`, each producing a story with rule numbers and a table of numbers over time. The most valuable of them is `device-replay`, which feeds the **recorded answers of real products** through the ordinary datagram path and reports not what the device said but **what our stack could do with it** — a real Elli wallbox announces seven use cases and we can play all seven, including the EV charging summary, which has no Go reference and was written from the specification alone. It also turned finding U3 into U5. 15 smoke tests |
 | **WP11a** | ✅ done — **the conformance test suite, protocol half** (`EEBUSConformance/`, `eebus conform`): the **whole official catalog** — 33 `TC_SHIP_*` and 31 `TC_SPINE_*` cases with their 52 requirements, roles, applicability and preconditions — as checked-in data, and **every one of the 64 executable** against a device. The test tool is deliberately not a SHIP node: half the catalog consists of things a well behaved node would never do, and all of it runs on a `FakeTimeProvider`, so twenty minutes of protocol take a few hundred milliseconds. Against our own stack: **60 passed, 1 warning, 1 failed, 2 not applicable** — and the run found **four real defects** (findings 4–7 in `docs/spec-deviations.md`), the worst of them one line which failed five test cases at once: the data exchange state refused every SME control message, so a perfectly legal access methods request killed the connection. The one failure is `TC_SHIP_CONN_001` and it stays: the specification's double connection rule and the one ship-go implements disagree, and following the specification would break us against the entire installed base (finding C1). 75 conformance tests |
-| **WP11b** | open — **the use case half**: `EEBus_UC_HighLevel_TestSpecification_{LPC,LPP,MGCP,MPC}_V1.0.2` (`docs/specs/Grid/Test Specifications/`), **211 further test cases** (LPC 53, LPP 53, MGCP 49, MPC 56) with their own parameter sheets. A separate branch in § 10 and a work package of its own size: the identifiers are shaped `TC_LPC_COM_PT_CSTransition10_002`, i.e. one case per transition of the state machine of WP09/1, per direction, negative and positive. The machinery they need — catalog, parameter sheet, runner, report, `LpcLppScenario` — already exists |
+| **WP11b** | ✅ done — **the conformance test suite, use case half**: `EEBus_UC_HighLevel_TestSpecification_{LPC,LPP,MGCP,MPC}_V1.0.2` — **203 abstract test cases** (LPC 51, LPP 51, MGCP 47, MPC 54) and their **216 requirements**, all of them executable, together with the four `EEBus_UC_ParameterSheet_*_V1.0.2` worksheets as JSON. The whole catalog is now **267 entries, 267 executable**. Against our own stack: **231 passed, 3 warnings, 1 failed, 32 not applicable, 0 inconclusive** — and the run found **six more real defects** (findings 8–13), the largest of them a rule which was not implemented at all: in "init", the failsafe state and "unlimited/autonomous", nothing but the limit may be written before a heartbeat and a limit have arrived, and the failsafe values were writable by anybody who could open a connection. The identifiers are `ATC_*` rather than `TC_*` — these specifications define *abstract* test cases, out of which the data sets of their section 6.11 derive **452 specific** ones, and the catalog carries both counts |
 | WP12–WP14 | open (order see § 10) |
 
 **Test inventory:** 119 SHIP + 126 SPINE + 175 use case tests within the stack (4 of them marked
-`[Category("LocalNetwork")]`: real sockets or multicast), 75 conformance tests within the test
+`[Category("LocalNetwork")]`: real sockets or multicast), 276 conformance tests within the test
 bench, 15 simulation smoke tests, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
 
@@ -970,7 +972,46 @@ In order of priority:
 > the state — so a device which forgets would hold a limit for ever. Both LPC simulations do it and
 > say so.
 
-### WP11 — the conformance test suite *(L; grows along from WP01 on)* — WP11a ✅ **done**, WP11b open
+### WP11 — the conformance test suite *(L; grows along from WP01 on)* — WP11a ✅ **done**, WP11b ✅ **done**
+
+> **Result of WP11b.** The four use case high level test specifications are in the same catalog
+> as the protocol ones: `Catalog/PowerLimitationCatalog.cs` and `Catalog/MonitoringCatalog.cs`
+> hold the 203 abstract test cases and 216 requirements, `Parameters/UseCaseParameters.cs` holds
+> the four parameter sheets, `TestTool/PowerLimitationScenario.cs` and
+> `TestTool/MonitoringScenario.cs` are the two test tools, and `Cases/UseCases/` executes all 203.
+>
+> Five things are worth writing down:
+>
+> 1. **The identifiers are `ATC_*`, not `TC_*`.** The plan guessed wrong. These specifications
+>    define *abstract* test cases and derive *specific* ones from them by filling in the data
+>    sets of section 6.11 — "(all)" means one execution per value — so 203 abstract cases become
+>    452 specific ones. Both numbers are in the catalog and both are checked against the official
+>    parameter sheets, because the second is the one a certification body counts. The plan's
+>    "211 test cases" counted the illustrative identifiers in the naming-convention chapters.
+> 2. **LPC and LPP are one specification pointed in two directions**, and so are their tests. The
+>    catalog entries, the requirement texts and the case bodies are written once and instantiated
+>    twice; only the wording differs, over five tokens. The same is true of the two monitoring
+>    specifications' phase and voltage families, which are matrices and are generated as such —
+>    twelve hand-written voltage cases is how the eleventh one ends up checking phase B twice.
+> 3. **The parameter sheet decides more here than it did in WP11a.** Half of what these
+>    specifications mark optional is optional *conditionally*: the "Optional Support" worksheet
+>    turns a recommended case into a mandatory one, and a declaration of "no" makes it not
+>    applicable. 32 of the 267 entries are not applicable to this stack, and every one of them
+>    says which row of which worksheet decided that.
+> 4. **One case is not on the wire at all.** `ATC_*_COM_PT_CSUnlAuto_002` compares what a device
+>    actually draws against the maximum it published. A software test bench has no wattmeter, so
+>    it is reported as not applicable rather than passed — which is what the sheet's
+>    "Supplementary optional verifications" M1/N1 exist to record.
+> 5. **Two capabilities had to be built before the tests could ask their questions**, and both
+>    are real features rather than test hooks: an energy guard which introduces itself with a
+>    heartbeat and a following limit when it finds a controllable system (rule 913), and a
+>    monitored device which can publish a measurement *together with the state of that
+>    measurement*. Without the second, "a value marked out of range SHALL be ignored" cannot be
+>    tested from the outside at all.
+>
+> **The six defects it found** are findings 8–13 in `docs/spec-deviations.md`. Ten official test
+> cases failed on one missing rule (037); twenty-six failed because a monitoring appliance read
+> values the meter itself had disclaimed.
 
 > **Result.** `EEBUSConformance/` holds the catalog as data (`Catalog/`), the manufacturer
 > declarations (`Parameters/ParameterSheet.cs`), the two test tools (`TestTool/`), the runner and

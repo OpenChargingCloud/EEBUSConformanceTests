@@ -41,8 +41,16 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance.tests
 
         /// <summary>
         /// The official catalogs hold thirty-three SHIP and thirty-one SPINE
-        /// test cases. If either number changes, a specification was updated
+        /// test cases, and 203 abstract test cases across the four use case
+        /// specifications. If any number changes, a specification was updated
         /// and this suite has not caught up.
+        ///
+        /// The use case numbers are checked against the count each official
+        /// parameter sheet states about itself on its "Report" worksheet, which
+        /// is the one place the specifications total themselves up. The number of
+        /// *specific* test cases is checked with them, because that is the
+        /// number a certification body counts: an abstract case whose data set
+        /// says "(all)" is executed once per value.
         /// </summary>
         [Test]
         public void TheCatalogIsComplete()
@@ -55,6 +63,29 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance.tests
 
                 Assert.That(ConformanceCatalog.Of(ConformanceLayers.SPINE).Count(), Is.EqualTo(31),
                             "EEBus_SPINE_TestSpecification_V1.0.0 defines 31 test cases.");
+
+                foreach (var (useCase, cases, specific) in new[] {
+                             ("LPC",  51, 99),
+                             ("LPP",  51, 99),
+                             ("MGCP", 47, 110),
+                             ("MPC",  54, 144)
+                         })
+                {
+
+                    var entries = ConformanceCatalog.TestCases.
+                                      Where(testCase => testCase.Id.StartsWith($"ATC_{useCase}_", StringComparison.Ordinal)).
+                                      ToList();
+
+                    Assert.That(entries.Count, Is.EqualTo(cases),
+                                $"EEBus_UC_HighLevel_TestSpecification_{useCase}_V1.0.2 defines {cases} abstract test cases.");
+
+                    Assert.That(entries.Sum(testCase => testCase.SpecificTestCases), Is.EqualTo(specific),
+                                $"EEBus_UC_ParameterSheet_{useCase}_V1.0.2 counts {specific} specific test cases.");
+
+                }
+
+                Assert.That(ConformanceCatalog.Of(ConformanceLayers.UseCase).Count(), Is.EqualTo(203),
+                            "The four use case test specifications define 203 abstract test cases together.");
 
             });
 

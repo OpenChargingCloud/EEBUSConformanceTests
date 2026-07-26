@@ -95,6 +95,22 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
                                                 String  Text)
     {
 
+        /// <summary>
+        /// Why the test specification itself declines to test this requirement,
+        /// or null when it does test it.
+        ///
+        /// The use case test specifications say so out loud in their requirement
+        /// coverage table - "Out of scope (requirements refer to local
+        /// regulations, external standards, internal conditions, etc.)" or "Out
+        /// of scope (The test specification does not check the quality of the
+        /// data.)" - and that is worth carrying rather than dropping. A
+        /// requirement nobody tests is a different thing from a requirement
+        /// nobody wrote down, and a reader of the coverage table deserves to see
+        /// which of the two it is looking at.
+        /// </summary>
+        public String? OutOfScope { get; init; }
+
+
         public override String ToString()
 
             => $"{Id} ({Source}): {Text}";
@@ -164,6 +180,25 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
         /// </summary>
         public String?                         KnownDeviation          { get; init; }
 
+        /// <summary>
+        /// Into how many specific test cases this one is varied by the data sets
+        /// of the test specification.
+        ///
+        /// One for everything in the SHIP and SPINE catalogs, which know no such
+        /// layer, and whatever the official parameter sheet says for the use case
+        /// ones - three executions of ATC_LPC_COM_PT_CSTransition2_001, one per
+        /// value of APCL, because the case marks its data set "(all)". Carrying
+        /// it makes the number in a report comparable with the number a
+        /// certification body counts.
+        /// </summary>
+        public UInt32                          SpecificTestCases       { get; init; } = 1;
+
+        /// <summary>
+        /// The data sets the case is varied over, in the specification's own
+        /// wording, e.g. "APCL values (all): APCL_02, APCL_03, APCL_04".
+        /// </summary>
+        public String?                         Variation               { get; init; }
+
 
         /// <summary>
         /// Whether this case applies to a device declaring the given parameters.
@@ -214,13 +249,15 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
         #region Data
 
         private static readonly Lazy<IReadOnlyList<ConformanceTestCase>> testCases = new (
-            () => [ .. SHIPCatalog. TestCases,
-                    .. SPINECatalog.TestCases ]
+            () => [ .. SHIPCatalog.   TestCases,
+                    .. SPINECatalog.  TestCases,
+                    .. UseCaseCatalog.TestCases ]
         );
 
         private static readonly Lazy<IReadOnlyList<ConformanceRequirement>> requirements = new (
-            () => [ .. SHIPCatalog. Requirements,
-                    .. SPINECatalog.Requirements ]
+            () => [ .. SHIPCatalog.   Requirements,
+                    .. SPINECatalog.  Requirements,
+                    .. UseCaseCatalog.Requirements ]
         );
 
         #endregion
@@ -307,8 +344,18 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
                         yield return $"{testCase.Id} refers to the unknown requirement {requirement}.";
 
             foreach (var requirement in Requirements)
-                if (!TestCasesFor(requirement.Id).Any())
+                if (requirement.OutOfScope is null &&
+                    !TestCasesFor(requirement.Id).Any())
                     yield return $"No test case verifies {requirement.Id}.";
+
+            foreach (var requirement in Requirements)
+                if (requirement.OutOfScope is not null &&
+                    TestCasesFor(requirement.Id).Any())
+                    yield return $"{requirement.Id} is marked out of scope, but " +
+                                 $"{String.Join(", ", TestCasesFor(requirement.Id).Select(testCase => testCase.Id))} verifies it.";
+
+            foreach (var duplicate in Requirements.GroupBy(requirement => requirement.Id).Where(group => group.Count() > 1))
+                yield return $"The requirement {duplicate.Key} exists {duplicate.Count()} times.";
 
             foreach (var duplicate in TestCases.GroupBy(testCase => testCase.Id).Where(group => group.Count() > 1))
                 yield return $"The test case {duplicate.Key} exists {duplicate.Count()} times.";

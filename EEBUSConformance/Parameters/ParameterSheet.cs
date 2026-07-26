@@ -171,10 +171,18 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
 
         /// <summary>
         /// Which use case actors the device implements: "EG" for energy guard,
-        /// "CS" for controllable system. The actor, never the role, decides
-        /// whether a use case flavoured test case applies.
+        /// "CS" for controllable system, "MA" for monitoring appliance, "MU" for
+        /// monitored unit, "GCP" for grid connection point. The actor, never the
+        /// role, decides whether a use case flavoured test case applies.
         /// </summary>
-        public IReadOnlySet<String>     Actors                            { get; init; } = new HashSet<String> { "EG", "CS" };
+        public IReadOnlySet<String>     Actors                            { get; init; } = new HashSet<String> { "EG", "CS", "MA", "MU", "GCP" };
+
+        /// <summary>
+        /// The four use case parameter sheets: what the manufacturer declares
+        /// about the ranges, data points and optional functionality of the
+        /// limitation and monitoring use cases.
+        /// </summary>
+        public UseCaseParameters        UseCases                          { get; init; } = new ();
 
         /// <summary>
         /// What the device is called in the report.
@@ -220,9 +228,70 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
             LpcLppTestValue1                  = 4201,
             LpcLppTestValue2                  = 3300,
 
-            Actors                            = new HashSet<String> { "EG", "CS" },
+            Actors                            = new HashSet<String> { "EG", "CS", "MA", "MU", "GCP" },
             DeviceName                        = "WWCP_EEBUS",
-            Manufacturer                      = "GraphDefined GmbH"
+            Manufacturer                      = "GraphDefined GmbH",
+
+            // Two of these are deliberately modest as well. The stack has no
+            // wattmeter, so PhysicalMeasurement stays "no" and the two cases
+            // which compare real consumption against a nominal maximum are
+            // reported as not applicable rather than passed. Polling stays "no"
+            // because our monitoring appliance subscribes - which the general
+            // implementation guideline § 3.2.2 asks it to - so the polling cases
+            // are not about this device.
+            UseCases                          = new UseCaseParameters {
+
+                                                    LPC   = new PowerLimitationParameters {
+                                                                SystemIsEnergyManager   = false,
+                                                                LimitMin                = 0,
+                                                                LimitMax                = 11000,
+                                                                FailsafeMin             = 0,
+                                                                FailsafeMax             = 11000,
+                                                                PreConfiguredFailsafe   = 4200,
+                                                                PhysicalMeasurement     = false,
+
+                                                                // Rule 046 is a "should", and what a NACK ought to
+                                                                // provoke - retry, back off, choose another value -
+                                                                // depends on why the energy guard wanted the limit.
+                                                                // The stack reports the refusal and lets the
+                                                                // application decide, so the honest answer to
+                                                                // "quick resend write APCL if previous write APCL
+                                                                // was rejected" is no.
+                                                                GuardResendsAfterReject = false
+                                                            },
+
+                                                    LPP   = new PowerLimitationParameters {
+                                                                SystemIsEnergyManager   = false,
+                                                                LimitMin                = 0,
+                                                                LimitMax                = 11000,
+                                                                FailsafeMin             = 0,
+                                                                FailsafeMax             = 11000,
+                                                                PreConfiguredFailsafe   = 4200,
+                                                                PhysicalMeasurement     = false,
+
+                                                                // Rule 046 is a "should", and what a NACK ought to
+                                                                // provoke - retry, back off, choose another value -
+                                                                // depends on why the energy guard wanted the limit.
+                                                                // The stack reports the refusal and lets the
+                                                                // application decide, so the honest answer to
+                                                                // "quick resend write APCL if previous write APCL
+                                                                // was rejected" is no.
+                                                                GuardResendsAfterReject = false
+                                                            },
+
+                                                    MGCP  = new MonitoringParameters {
+                                                                Polling              = false,
+                                                                Notification         = true,
+                                                                PhaseToPhaseVoltage  = false
+                                                            },
+
+                                                    MPC   = new MonitoringParameters {
+                                                                Polling              = false,
+                                                                Notification         = true,
+                                                                PhaseToPhaseVoltage  = false
+                                                            }
+
+                                                }
 
         };
 
@@ -270,7 +339,11 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
                                                         : fallback.Actors,
 
                 DeviceName                        =           JSON["deviceName"]?.  Value<String>() ?? fallback.DeviceName,
-                Manufacturer                      =           JSON["manufacturer"]?.Value<String>() ?? fallback.Manufacturer
+                Manufacturer                      =           JSON["manufacturer"]?.Value<String>() ?? fallback.Manufacturer,
+
+                UseCases                          = JSON["useCases"] is JObject useCases
+                                                        ? UseCaseParameters.Parse(useCases)
+                                                        : fallback.UseCases
 
             };
 
@@ -321,7 +394,9 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
                    new JProperty("PAR_spineVersion",                      SpineVersion),
                    new JProperty("PAR_limitationUseCase",                 LimitationUseCase),
                    new JProperty("PAR_lpcLpp_Test_Value1",                LpcLppTestValue1),
-                   new JProperty("PAR_lpcLpp_Test_Value2",                LpcLppTestValue2)
+                   new JProperty("PAR_lpcLpp_Test_Value2",                LpcLppTestValue2),
+
+                   new JProperty("useCases",                              UseCases.ToJSON())
 
                );
 
@@ -353,6 +428,9 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance
 
             if (MajorOf(TestToolShipVersion) != MajorOf(ShipVersion))
                 yield return $"PAR_testToolShipVersion ({TestToolShipVersion}) and PAR_shipVersion ({ShipVersion}) have to share their major version.";
+
+            foreach (var complaint in UseCases.Validate())
+                yield return complaint;
 
         }
 

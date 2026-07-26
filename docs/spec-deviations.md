@@ -422,3 +422,52 @@ Found by the official test specifications in WP11, all four in the stack (`libs/
    SPINE 7.3.1 gives that feature the role "special", which cannot be bound — and a binding to
    it is a licence to write into the very place where the device keeps its topology, its
    bindings and its subscriptions. Fixed in `SPINENodeManagement.HandleRelationCall`.
+
+Found by the four use case high level test specifications in WP11b, all six in the stack:
+
+8. **A limit which was refused did not move the state machine** (`ATC_LPC_COM_PT_CSTransition1_001`,
+   `…_CSTransition8_001`, `…_CSTransition11_001`, and the same three under `ATC_LPP_*`). A value
+   below zero was rejected *before* `PowerLimitationStateMachine.LimitWritten` ever saw it, so
+   the controllable system stayed where it was. Rules 902, 918 and the transitions 1, 8 and 11
+   say the opposite, and the reason is worth stating: what ends "init", the failsafe state and
+   "unlimited/autonomous" is not a *usable* limit, it is the proof that an energy guard is
+   there at all. A device which refuses the value and stays in its failsafe state has taken the
+   one message which shows it is not alone and concluded from it that it is. Fixed in
+   `APowerLimitationControllableSystem.ApproveLimit`.
+9. **…and in the two controlled states it moved the state machine when it should not have**
+   (`ATC_*_COM_NT_CSLimited_001`). The mirror image of finding 8, and a separate rule: in
+   "limited" and "unlimited/controlled" the energy guard is already known to be there, so
+   rejecting a limit changes nothing (rules 907/1 and 907/2). The state machine had folded
+   "the guard deactivated the limit" and "the limit could not be applied" into one condition, so
+   an inapplicable value silently unlimited a limited device. Fixed in
+   `PowerLimitationStateMachine.LimitWritten`.
+10. **Rule 037 was not implemented at all** (`ATC_*_COM_PT_CSConnection_002`/`_004`,
+    `…_CSFS_001`/`_003`, `…_NT_CSUnlAuto_001` — ten cases across the two use cases). In "init",
+    the failsafe state and "unlimited/autonomous", commands on any data point *other* than the
+    limit are evaluated only after a heartbeat and a following limit. The failsafe values are
+    what a device falls back on when everything else has failed, so letting an unproven partner
+    rewrite them hands over the one number which was supposed to be safe. Fixed in
+    `APowerLimitationControllableSystem.ApproveConfiguration`.
+11. **A rejected failsafe duration left the old value in place** (`ATC_*_COM_PT_CSConnection_005`
+    and `…_008`). Rule 022/5: having refused a duration longer than it accepts, the controllable
+    system SHALL move to its own maximum. Refusing and changing nothing leaves the energy guard
+    believing a number the device never confirmed, and the two of them then disagree about how
+    long a failsafe state would last.
+12. **The controllable system never sent the heartbeat it declares** (`ATC_*_COM_PT_CSHeartbeat_001`).
+    Table 21 lists `deviceDiagnosisHeartbeatData` among its server data and rule 006/032 asks for
+    one at least every 60 seconds; the feature and the function existed and nothing ever wrote
+    them. An energy guard watching it would have concluded the appliance had died. Fixed by
+    giving `APowerLimitationControllableSystem` a `SPINEHeartbeat` of its own.
+13. **A value marked "out of range" or "error" was read as if it were good**
+    (`ATC_MGCP_SCE*_NT_MA*` and `ATC_MPC_SCE*_NT_MA*` — 26 cases). MPC 2.5.2 and MGCP 2.6.2 both
+    say such a value SHALL be ignored by the monitoring appliance; `AMonitoringAppliance.Readings`
+    returned a list of numbers without looking at their state. A meter which knows its reading is
+    wrong and says so has done its job — an energy manager which takes the number anyway has
+    turned a detected fault into an undetected one. Fixed there.
+
+Two more things the use case specifications asked for and this stack did not do at all, now
+implemented rather than reported: the energy guard introduces itself with a heartbeat and a
+following limit whenever it (re)discovers a controllable system (rule 913, `AnnounceTo`), and a
+monitored device can publish a measurement together with the state of that measurement
+(`AMonitoredDevice.Set`, `MeasurementValueStateType`) — without which finding 13 could not have
+been detected from the outside at all.

@@ -161,7 +161,7 @@ namespace cloud.charging.open.protocols.EEBUS.Simulations
 
                     await unit.Set(MonitoringOfPowerConsumption.PowerTotal,
                                    power,
-                                   cancellationToken);
+                                   CancellationToken: cancellationToken);
 
                     // What the energy manager knows, read from its own side of
                     // the wire rather than from the meter's.
