@@ -35,9 +35,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP03** | ✅ done — `SHIPServiceTXT` (SHIP 7.3.2 including `serial`/`cat`, manufacturer keys survive parsing), `SHIPServiceInstance`, `ISHIPDiscovery` with two implementations: **`SHIPMDNSDiscovery`** (real multicast DNS: responder, browser, goodbye with TTL 0) and `InMemorySHIPDiscovery` for environments without multicast. **Own DNS-SD wire encoding** (`SHIPMDNSMessage`), because Hermod's `TXT` carries only *one* string while DNS-SD requires one character string per key/value pair (RFC 6763 §6.1) — including name compression when reading. Live test over real multicast green. |
 | **WP04** | ✅ done — `SHIPConnection` with all phases (CMI, hello including prolongation, protocol handshake, PIN, access methods, data, close); **every timer runs on a TimeProvider**, tests use `FakeTimeProvider` without a single real wait |
 | **WP05** | ✅ done — `SHIPNode` (connection registry, **double connection rule** SHIP 12.2.2 in both directions, pairing with approve/reject, `ISHIPTrustStore` as in-memory and JSON file variant, protection against connecting to itself) plus **`SHIPWebSocketEndpoint`**: Hermod WebSocket server and client with sub protocol `ship`, the TLS profile of WP02, SKI extraction from the TLS handshake. **End-to-end test green:** two nodes over real TLS WebSockets, from the TLS handshake to the SPINE datagram. |
-| WP06–WP14 | open (order see § 10) |
+| **WP06a** | ✅ done — `Apps/EEBUSModelGen` generates the SPINE 1.3.0 model from the 76 official XSDs: **562 complex types, 81 enumerations, 142 functions, 2133 properties** in 121 checked-in files. Extensible string types in the `PredefinedStrings` style, the function registry `SPINEFunctions`, `[EEBUSFunction]`/`[EEBUSKey]` metadata, the ISO 8601 types keeping their text, `SPINEJSON` for the two JSON defaults which are wrong for this protocol. Checked against spine-go through a generated fixture **and** against its 23 recorded datagrams; ADR `docs/adr/0002-spine-model-generation.md`, three findings in `docs/spec-deviations.md` |
+| WP06b–WP14 | open (order see § 10) |
 
-**Test inventory:** 117 SHIP + 1 SPINE + 1 use case tests within the stack (4 of them marked
+**Test inventory:** 117 SHIP + 20 SPINE + 1 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -590,7 +591,15 @@ The goal: the complete SPINE 1.3.0 model within `WWCP_EEBUS_SPINE/Model/`. **The
 strategy is code generation from the 76 official XSDs** (for the path see appendix B, "SPINE
 XSDs"); spine-go serves as the oracle for the JSON field names and behavioural details.
 
-* **6a the generator (first, M):** a small tool `Apps/EEBUSModelGen` (in this repository,
+* **6a the generator (first, M):** ✅ **done** — see `docs/adr/0002-spine-model-generation.md`
+  for what was decided and why. Regenerate with `dotnet run --project Apps/EEBUSModelGen`
+  (`--list` reports without writing). Two rules turned out to matter more than expected:
+  an anonymous type declared inline is the named type it restricts (119 properties were
+  silently typed as `String` before that was handled — the fixture comparison could not see it,
+  the roundtrip over the recorded datagrams did), and `SPINEJSON` has to be used for reading and
+  writing, because `DateParseHandling` mangles every timestamp and an empty list arrives as
+  `{}`. The remaining sub-packages 6b and 6c are unchanged.
+  <br>The original plan for 6a, for reference: a small tool `Apps/EEBUSModelGen` (in this repository,
   because the XSDs live here): it parses the XSDs (`System.Xml.Schema`/`XmlSchemaSet`) and
   generates one C# file per resource, following fixed rules:
   * `xs:simpleType` enumerations with an `EnumExtendType` union → **extensible string types**

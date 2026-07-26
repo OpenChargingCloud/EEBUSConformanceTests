@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>cloud.charging.open.protocols.EEBUS.ModelGen</RootNamespace>
+    <AssemblyName>eebus-modelgen</AssemblyName>
+  </PropertyGroup>
+
+</Project>
