@@ -41,9 +41,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP07** | ✅ done — the **SPINE core** in `WWCP_EEBUS_SPINE/Core/`: the device/entity/feature tree on both sides, `SPINEFunctionData` (one class for all 142 functions), `SPINESender` (message counter, deduplication of unanswered requests, results and replies), `SPINELocalDevice.ProcessDatagram` (addressing, permissions, routing, and a SPINE result for every refusal), **node management** complete (detailed discovery in both directions including the entity add/remove notifies, use case data, destination list, subscription and binding calls), the subscription and binding registries, the **event bus** with core/application levels and the **heartbeat** on a TimeProvider. ADR `docs/adr/0004-spine-core.md`. 47 new tests over a loopback pair of devices which records every datagram |
 | **WP08** | ✅ done — the **use case framework** in `WWCP_EEBUS_UseCases/`: `UseCaseNames`/`UseCaseActors` (SPINE leaves both enumerations deliberately empty), `UseCaseVersion` with the discovery rules of section 3.1.2 which every use case specification repeats, `AUseCase` (registration, availability, partner discovery, scenario matching against the partner's server features, events) and `UseCaseFeature` — one helper instead of the nine typed ones of eebus-go. The rules of `EEBus_UC_IG_GeneralGuidelines_V1.0.0` are applied where they are code and written down in the ADR where they are conformance checks for WP11. ADR `docs/adr/0005-use-case-framework.md`, finding S8 |
 | **WP09/1** | ✅ done — **LPC on both sides** (`WWCP_EEBUS_UseCases/LPC/`): the energy guard and the controllable system, all four scenarios, and the **state machine of section 2.3** which eebus-go leaves to the application. 28 tests: the twelve transitions and Table 1 against a fake clock, and the whole use case over the wire from discovery through binding to the failsafe fallback |
-| WP09/2–WP14 | open (order see § 10) |
+| **WP09/2** | ✅ done — **OPEV on both sides** (`WWCP_EEBUS_UseCases/OPEV/`), including the **EV side, which eebus-go does not have**: the specification's chapter 3 behaviour of falling back to a safe current when the energy guard goes quiet ([OPEV-005], four seconds) or announces a failure ([OPEV-007]). 12 tests |
+| WP09/3–WP14 | open (order see § 10) |
 
-**Test inventory:** 118 SHIP + 125 SPINE + 58 use case tests within the stack (4 of them marked
+**Test inventory:** 118 SHIP + 125 SPINE + 70 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -750,11 +751,23 @@ In order of priority:
    <br>Still open here: the §14a details of
    `Grid/Implementation Guides/EEBus_UC_IG_LimitationOfPowerConsumption_V1.1.0.pdf` were not read
    yet, and the LPC V1.0.2 high level test specification flows into WP11.
-2. **OPEV** (`cem/opev` and the specification `EEBus_UC_TS_OverloadProtection…V1.0.1b.pdf`)
-   plus the counterpart on the "EV side" (not present as a server use case in eebus-go — we
-   build **both** sides, the EV server side following chapter 3 of the specification, and
-   validate the behaviour against `examples/evse` and `hems`). Mind the actor nuance
-   (specification: Energy Guard, eebus-go: CEM — § 2.3).
+2. **OPEV** — ✅ **done**. `OPEVEnergyGuard`, `OPEVElectricVehicle` and `OverloadProtection`.
+   <br>The EV side is the part with no reference implementation: eebus-go has `cem/opev` only, so
+   the behaviour a certification actually tests an EV for had to come from chapter 3 of the
+   specification alone. It is two rules and they are the point of the use case — no heartbeat for
+   more than **four** seconds ([OPEV-005]) or an announced failure ([OPEV-007]) and the EV charges
+   with a safe current of its own choosing. The second one is the faster of the two: the energy
+   guard is still beating, so the availability check would never notice.
+   <br>The actor nuance is handled rather than chosen: the specification says **EnergyGuard**, the
+   certified Go implementation announces **CEM**, so our EV accepts both and our energy guard can
+   announce either (`AnnounceAsCEM`). An EV which accepts only one would not work with half the
+   field.
+   <br>Everything here is faster and smaller than LPC: a current per phase instead of a power, four
+   seconds instead of 120, and no failsafe value to configure. The reason is section 2.1 — a
+   sensitive circuit breaker trips within six seconds at twice its nominal current, and the whole
+   chain has to fit inside that.
+   <br>Still open: validating against `eebus-go/examples/evse` and `hems` belongs to WP12
+   (interoperability), not here.
 3. **MPC** (`mu/mpc` + `ma/mpc`).
 4. **LPP**, **MGCP**.
 5. **EVSECC**, **EVCC**, **EVCEM**, **EVSOC** (the specifications V1.0.1 respectively EVSOC
