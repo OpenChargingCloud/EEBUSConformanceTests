@@ -38,9 +38,10 @@ approval); afterwards the submodule pointer is updated here.
 | **WP06a** | ✅ done — `Apps/EEBUSModelGen` generates the SPINE 1.3.0 model from the 76 official XSDs: **562 complex types, 81 enumerations, 142 functions, 2133 properties** in 121 checked-in files. Extensible string types in the `PredefinedStrings` style, the function registry `SPINEFunctions`, `[EEBUSFunction]`/`[EEBUSKey]` metadata, the ISO 8601 types keeping their text, `SPINEJSON` for the two JSON defaults which are wrong for this protocol. Checked against spine-go through a generated fixture **and** against its 23 recorded datagrams; ADR `docs/adr/0002-spine-model-generation.md`, three findings in `docs/spec-deviations.md` |
 | **WP06b** | ✅ done — the generated types are `partial` and serialise **opt-in**, so the hand-written semantics live under `WWCP_EEBUS_SPINE/Additions/` and cannot leak into a datagram: `ScaledNumberType.Value`/`FromValue` (decimal, exact), the address `ToString`/`Matches`/`Clone`, `TimePeriodType.Duration(TimeProvider)`, `PossibleOperationsType`, `CmdType`/`FilterType`/`CmdControlType` reaching every function through the generated `[EEBUSFunction]` metadata, the one-line datagram overview, the SPINE error numbers, `UseCaseInformationDataType` set/find/supports/remove |
 | **WP06c** | ✅ done — the **restricted function exchange** (SPINE 1.3.0, § 5.3.4) as one generic engine over the model metadata, `WWCP_EEBUS_SPINE/Update/`: selector matching (including the exact-match rule for entity addresses), element filters which reach into nested elements, merging by identifiers, the "list item without identifier applies to all entries" rule, the write marks, and `SPINERead` for the answering half of a partial read. **All 29 official example datagrams of Annex A** are tests: read by the model, written back unchanged, put through the EEBUS JSON transformation of SHIP and back, and applied to a defined state. ADR `docs/adr/0003-spine-update-system.md`, four further findings (S4–S7) in `docs/spec-deviations.md` |
-| WP07–WP14 | open (order see § 10) |
+| **WP07** | ✅ done — the **SPINE core** in `WWCP_EEBUS_SPINE/Core/`: the device/entity/feature tree on both sides, `SPINEFunctionData` (one class for all 142 functions), `SPINESender` (message counter, deduplication of unanswered requests, results and replies), `SPINELocalDevice.ProcessDatagram` (addressing, permissions, routing, and a SPINE result for every refusal), **node management** complete (detailed discovery in both directions including the entity add/remove notifies, use case data, destination list, subscription and binding calls), the subscription and binding registries, the **event bus** with core/application levels and the **heartbeat** on a TimeProvider. ADR `docs/adr/0004-spine-core.md`. 47 new tests over a loopback pair of devices which records every datagram |
+| WP08–WP14 | open (order see § 10) |
 
-**Test inventory:** 117 SHIP + 78 SPINE + 1 use case tests within the stack (4 of them marked
+**Test inventory:** 118 SHIP + 123 SPINE + 1 use case tests within the stack (4 of them marked
 `[Category("LocalNetwork")]`: real sockets or multicast), 5 conformance tests within the test
 bench, 2 interoperability tests (green in WSL). The CI excludes `LocalNetwork`, because runners
 provide neither multicast nor a free port 5353 reliably.
@@ -663,17 +664,36 @@ XSDs"); spine-go serves as the oracle for the JSON field names and behavioural d
 
 A port of the logic from `libs/spine-go/spine/`:
 
-* **7a:** `DeviceLocal/Remote`, `EntityLocal/Remote`, `FeatureLocal/Remote`, the function data
-  store with partial updates, the `Sender` (msgCounter, request tracking, deduplication like
-  `send.go`), the routing in `ProcessCmd` including the error `result`.
-* **7b:** node management completely (detailed discovery including the entity add/remove
-  notifies, subscriptions, bindings, use case data, the destination list).
-* **7c:** the SubscriptionManager, the BindingManager (write permissions only with a binding!),
-  the HeartbeatManager (sending and monitoring, on a TimeProvider), the event bus (core versus
-  application level).
-* **Tests:** counterparts of `spine-go/spine/*_test.go` (very extensive there); an in-memory
-  pair LocalDevice ↔ LocalDevice over a loopback `ISHIPConnectionDataWriter`; golden datagrams
-  byte by byte (with a deterministic msgCounter through an injectable counter).
+✅ **done** — see `docs/adr/0004-spine-core.md` for what was decided and why.
+
+* **7a:** ✅ `SPINELocalDevice`/`Entity`/`Feature` and their remote counterparts, `SPINEFunctionData`
+  on the WP06c update engine, `SPINESender`, `SPINELocalDevice.ProcessDatagram`.
+* **7b:** ✅ `SPINENodeManagement` — a feature like any other, deriving from `SPINELocalFeature`
+  and overriding the handling of its nine functions.
+* **7c:** ✅ the subscription and binding registries (`SPINEFeatureRelations`, the same shape used
+  twice), `SPINEEvents` with core/application levels, `SPINEHeartbeat` on a `TimeProvider`.
+* **Tests:** 47, over two devices wired to each other through an in-memory `ISPINEWriter` which
+  records every datagram — so they assert the exchange (which datagrams, in which order, with
+  which message counters and addresses) and not only the result. The message counters are
+  injectable and start at 1, so a recorded exchange can be compared datagram by datagram.
+
+Three things turned out to matter more than expected:
+
+1. **Nothing is per function.** The generated registry and the generic update engine mean
+   `SPINEFunctionData` is one class for all 142 of them; spine-go needs about forty hand-written
+   files and a 321-line factory for the same thing.
+2. **The waiting has to be set up before the question leaves.** Over a loopback the reply is
+   processed while the send is still on the stack, and on a real link it is a race lost now and
+   then. `SPINESender.PrepareRequest` hands out the message counter and the datagram separately
+   for exactly this reason.
+3. **A command which says two things about itself is rejected** before anything is applied
+   (5.3.4.1): a filter without `cmd.function`, or a `cmd.function` which disagrees with the
+   payload or with a filter, is how a filter ends up applied to the wrong data type.
+
+Also found and fixed one layer down: every incoming SHIP frame was parsed with the date handling
+of the JSON library switched on, so a SPINE timestamp lost its exact text at the outermost layer
+before any SPINE type had seen it — the third occurrence of that trap in this stack and the first
+on the real receive path.
 
 ### WP08 — the use case framework *(M; needs WP07)*
 
