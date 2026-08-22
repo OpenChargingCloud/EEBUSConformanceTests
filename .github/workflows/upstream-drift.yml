@@ -267,6 +267,32 @@ jobs:
       - name: Build
         run: dotnet build EEBUSConformanceTests.sln --configuration Release
 
+      - name: Build the EEBUS protocol stack
+        working-directory: libs/WWCP_EEBUS
+        run: dotnet build WWCP_EEBUS.sln --configuration Release
+
+      # This job ran the Interop category and nothing else, and that was a hole. The
+      # Interop category is two tests; the suite actually most exposed to a Go bump is
+      # WWCP_EEBUS_SPINE_Tests, because GoldenDatagrams_OfTheGoReferenceImplementation_Roundtrip
+      # reads libs/spine-go/spine/testdata LIVE — every *.json in it. Those tests only ran in
+      # the dotnet-stack job above, which keeps the Go modules pinned, so no job ever
+      # combined "new spine-go" with "the tests that read spine-go".
+      #
+      # It cost a red CI to notice: spine-go 261abb7 added two negative fixtures carrying a
+      # deliberately unknown member, and the pin bump surfaced them in ci.yml — a day later
+      # and in the workflow whose red is supposed to mean our own code broke. Everything
+      # that can see a Go module runs here now.
+      - name: Test the EEBUS protocol stack
+        timeout-minutes: 45
+        working-directory: libs/WWCP_EEBUS
+        run: dotnet test WWCP_EEBUS.sln --no-build --configuration Release --filter "TestCategory!=LocalNetwork" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=go-drift-stack" --results-directory artifacts
+
+      # TestEnvironment resolves the spine-go golden files for the conformance catalog too,
+      # so this is not merely the dotnet-stack job repeated with different pins.
+      - name: Conformance tests
+        timeout-minutes: 90
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory!=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=go-drift-conformance" --results-directory artifacts
+
       # This is the job that earns the workflow its keep. The interoperability suite talks
       # SHIP and SPINE to the Go implementations over loopback, so a protocol change on
       # their side — a renamed message field, a stricter handshake, a new required
@@ -274,11 +300,13 @@ jobs:
       # the only moment when the upstream commit that caused it is still obvious.
       - name: Interoperability tests
         timeout-minutes: 60
-        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=interop" --results-directory artifacts
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=go-drift-interop" --results-directory artifacts
 
       - name: Upload test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: drift-results-interop
-          path: artifacts/*.trx
+          name: drift-results-go
+          path: |
+            artifacts/*.trx
+            libs/WWCP_EEBUS/artifacts/*.trx
