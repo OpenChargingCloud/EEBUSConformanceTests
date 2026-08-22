@@ -124,7 +124,7 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance.tests
         public static DirectoryInfo RequireSubmodule(DirectoryInfo Submodule)
         {
 
-            if (!Submodule.Exists || Submodule.GetFileSystemInfos().Length == 0)
+            if (!Submodule.Exists || !IsCheckedOut(Submodule))
                 NUnit.Framework.Assert.Inconclusive(
                     $"The git submodule '{Submodule.FullName}' is not available. " +
                      "Run: git submodule update --init --recursive"
@@ -133,6 +133,29 @@ namespace cloud.charging.open.protocols.EEBUS.Conformance.tests
             return Submodule;
 
         }
+
+        /// <summary>
+        /// Whether a submodule directory holds anything besides its own ".git".
+        /// </summary>
+        /// <remarks>
+        /// The obvious test - "the directory is empty" - is not enough, because a
+        /// submodule which git registered but could not populate is not empty: it
+        /// holds the ".git" file pointing at .git/modules, and nothing else.
+        ///
+        /// That is not a hypothetical. "git submodule update --init libs/devices"
+        /// on Windows creates exactly that and then stops, because the recordings
+        /// contain "vaillant/arotherm-vwl-75:6a" and NTFS reserves the colon for
+        /// alternate data streams - the same reason ci.yml checks that submodule
+        /// out on Linux only. Counting ".git" as content made RealDeviceData_IsAvailable
+        /// a permanent failure on every Windows working copy, while the Windows CI
+        /// leg reported it inconclusive merely because it never creates the
+        /// directory at all. Two answers to one question, and the harsher one was
+        /// wrong.
+        /// </remarks>
+        private static Boolean IsCheckedOut(DirectoryInfo Submodule)
+
+            => Submodule.EnumerateFileSystemInfos().
+                         Any(entry => !entry.Name.Equals(".git", StringComparison.Ordinal));
 
         #endregion
 
