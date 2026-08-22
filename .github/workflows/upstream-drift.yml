@@ -236,9 +236,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # No cache-dependency-path here, unlike ci.yml and nightly.yml: those hash the pinned
-      # go.sum files, and this job has just replaced them. Caching a key that changes every
-      # time upstream commits buys nothing and only risks a stale restore.
+      # cache: false, unlike ci.yml and nightly.yml. Those hash the pinned go.sum files;
+      # this job has just replaced them, so a key derived from them would change on every
+      # upstream commit - nothing to hit, and a stale restore to risk.
+      #
+      # Merely leaving cache-dependency-path off was not enough, which the first run said
+      # out loud: setup-go then falls back to looking for a go.mod at the repository root,
+      # finds none because ours live under libs/, and warns "Restore cache failed:
+      # Dependencies file is not found". Turning caching off outright is what actually
+      # says "do not try".
       #
       # go-version is deliberately still a floor and not "stable": if upstream raises its
       # toolchain directive past this, the build says so instead of silently downloading a
@@ -247,6 +253,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: '1.26'
+          cache: false
 
       - name: Build the Go reference implementations
         shell: bash
