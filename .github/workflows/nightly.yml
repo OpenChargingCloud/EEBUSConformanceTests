@@ -1,0 +1,215 @@
+name: Nightly
+
+# The counterpart to ci.yml. That workflow gates every push and deliberately leaves two
+# things out: the "LocalNetwork" tests of the protocol stack, which need multicast and a
+# free port 5353, and — implicitly — everything that only fails once in twenty runs. A
+# gate whose red can also mean "the runner had no multicast" stops being read as a gate.
+# Those tests are still worth running, just not against a merge.
+#
+# Two things worth knowing about scheduled workflows: they only ever run on the default
+# branch, and GitHub disables them after 60 days without any repository activity. If this
+# stops reporting, that is the first thing to check.
+on:
+  schedule:
+    # 03:37 UTC. Not on the hour: GitHub's scheduler is busiest then and delays runs by
+    # tens of minutes. Also not 02:17, which is when Hermod's nightly runs.
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  full-suite:
+    name: Full suite (${{ matrix.leg }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    # The same two-leg matrix as ci.yml: Debian 13 in a bare debian:13 container, and
+    # Windows. See ci.yml for why it is exactly these two — in short: production parity
+    # and its OpenSSL on one side, Schannel/CryptoAPI chain building on the other.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+          - os: windows-latest
+            leg: windows-latest
+
+    steps:
+
+      # Before the checkout, because the bare debian:13 image has no git and
+      # actions/checkout would silently fall back to a REST tarball with no .git directory
+      # for the submodule step to work with. See ci.yml for the full reasoning and for what
+      # the remaining packages are for.
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata
+          git config --global --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Not "submodules: recursive": libs/devices contains a path with a colon
+      # (vaillant/arotherm-vwl-75:6a), which cannot be checked out on Windows.
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 \
+            libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/ship-go libs/spine-go libs/eebus-go
+
+      - name: Checkout device recordings (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: git submodule update --init --depth 1 libs/devices
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: dotnet build EEBUSConformanceTests.sln --configuration Release
+
+      - name: Build the EEBUS protocol stack
+        working-directory: libs/WWCP_EEBUS
+        run: dotnet build WWCP_EEBUS.sln --configuration Release
+
+      # The same set the gate runs. Repeating it here is still worth the minutes: it
+      # catches tests that only fail sometimes — and this suite is full of protocol
+      # timing — and it notices the day "dotnet-version: 10.0.x" resolves to a new SDK
+      # patch, on a night when nobody pushed at all. Fatal: a red here is a real
+      # regression.
+      - name: Test the EEBUS protocol stack
+        timeout-minutes: 45
+        working-directory: libs/WWCP_EEBUS
+        run: dotnet test WWCP_EEBUS.sln --no-build --configuration Release --filter "TestCategory!=LocalNetwork" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=${{ matrix.leg }}-stack" --results-directory artifacts
+
+      - name: Conformance tests
+        timeout-minutes: 90
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory!=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=${{ matrix.leg }}-conformance" --results-directory artifacts
+
+      # The two "LocalNetwork" tests of the stack: SHIP mDNS discovery on 224.0.0.251:5353
+      # and the SHIP WebSocket endpoint on a real interface. Informational on purpose — a
+      # hosted runner is not a normal LAN, and the Debian leg is a container on top of one.
+      # Multicast is not guaranteed, port 5353 may already be taken by the host resolver,
+      # and on the Windows leg the firewall drops inbound multicast by default. A failure
+      # here means "the runner could not do mDNS", which says nothing about our discovery
+      # code, so it must not turn the night red.
+      #
+      # Read the numbers below for a trend instead: these two normally either both pass or
+      # both fail together, so one passing and one failing IS worth investigating.
+      - name: Local network probes (informational)
+        continue-on-error: true
+        timeout-minutes: 15
+        working-directory: libs/WWCP_EEBUS
+        shell: bash
+        run: |
+          set +e
+          dotnet test WWCP_EEBUS.sln --configuration Release --no-build \
+            --filter "TestCategory=LocalNetwork" --logger "console;verbosity=normal" \
+            --logger "trx;LogFilePrefix=${{ matrix.leg }}-localnetwork" \
+            --results-directory artifacts 2>&1 | tee localnetwork.txt
+          {
+            echo "## Local network probes (informational, ${{ matrix.leg }})"
+            echo
+            echo "Network-dependent: failures here reflect runner multicast and port 5353,"
+            echo "not our discovery code."
+            echo
+            echo '```'
+            grep -E "Passed!|Failed!|Total tests|Passed:|Failed:" localnetwork.txt || tail -5 localnetwork.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      # Three .trx files per leg: the stack, the conformance catalog and the local network
+      # probes. The step summary above reduces the probes to five counters, which is the
+      # right amount to read every morning but the wrong amount when a night looks odd —
+      # the .trx names which case failed and why.
+      #
+      # continue-on-error on the probe step means it counts as successful here, so
+      # !cancelled() collects all three even on a night the probes went red.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.leg }}
+          path: |
+            artifacts/*.trx
+            libs/WWCP_EEBUS/artifacts/*.trx
+
+
+  interop:
+    name: Interoperability against the Go reference implementations
+    runs-on: ubuntu-latest
+    container: debian:13
+
+    steps:
+
+      # git before the checkout, plus gcc/libc6-dev for cgo. See ci.yml for both.
+      - name: Install prerequisites (Debian container)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git gcc libc6-dev libicu76 libssl3t64 libstdc++6 tzdata
+          git config --global --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 \
+            libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/ship-go libs/spine-go libs/eebus-go libs/devices
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # ship-go/spine-go/eebus-go require Go 1.24 (spine-go and eebus-go even pin
+      # "toolchain go1.24.4"), so anything older would force a toolchain download.
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache-dependency-path: |
+            libs/ship-go/go.sum
+            libs/spine-go/go.sum
+            libs/eebus-go/go.sum
+
+      - name: Build the Go reference implementations
+        shell: bash
+        run: |
+          for module in ship-go spine-go eebus-go; do
+            echo "::group::building $module"
+            (cd "libs/$module" && go build ./...)
+            echo "::endgroup::"
+          done
+
+      - name: Build
+        run: dotnet build EEBUSConformanceTests.sln --configuration Release
+
+      # The gate runs these too. Here they are worth repeating for the same reason as
+      # above and for one more: two implementations talking over loopback is where timing
+      # flakiness lives, and a nightly is the only place a once-in-twenty handshake race
+      # ever shows up as a pattern rather than as "retry, it went green".
+      - name: Interoperability tests
+        timeout-minutes: 60
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=interop" --results-directory artifacts
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-interop
+          path: artifacts/*.trx

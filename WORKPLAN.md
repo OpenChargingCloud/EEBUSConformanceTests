@@ -1,4 +1,4 @@
-# EEBUS Conformance & Interoperability Tests — Work Plan
+﻿# EEBUS Conformance & Interoperability Tests — Work Plan
 
 **Repository:** `OpenChargingCloud/EEBUSConformanceTests`
 **Status:** 2026-07-26 (after analysing ship-go, spine-go, eebus-go, Hermod, Styx, WWCP_EEBUS
@@ -494,7 +494,7 @@ An inventory of `libs/WWCP_EEBUS` (2026-07-26) and the refactoring tasks:
 > **An important trick:** `libs/Directory.Build.props` (empty) stops the MSBuild search, so
 > that `TreatWarningsAsErrors` from the root `Directory.Build.props` does **not** reach the
 > submodules (Hermod/Styx/WWCP_EEBUS) — otherwise the build fails on Hermod's warnings.
-> The CI (`.github/workflows/build-and-test.yml`) initialises the submodules **individually**
+> The CI (`.github/workflows/ci.yml`) initialises the submodules **individually**
 > instead of using `submodules: recursive`, because `libs/devices` cannot be checked out on
 > Windows (§ 9).
 
@@ -503,8 +503,14 @@ An inventory of `libs/WWCP_EEBUS` (2026-07-26) and the refactoring tasks:
   `libs/WWCP_EEBUS` projects.
 * `Directory.Build.props`: net10.0, LangVersion latest, Nullable, TreatWarningsAsErrors,
   shared versions. `.gitignore`: among others `docs/specs/`.
-* GitHub Actions: submodules, `dotnet build` + `dotnet test` (Windows + Linux); a second job
-  installs Go for the interoperability tests (`actions/setup-go`).
+* GitHub Actions: `ci.yml` gates every push — submodules, `dotnet build` + `dotnet test`
+  on Windows and inside a `debian:13` container (production parity, and the OpenSSL the
+  SHIP handshake actually meets); a second job installs Go for the interoperability
+  tests (`actions/setup-go`). `nightly.yml` repeats that on a schedule and adds the
+  `LocalNetwork` tests non-fatally. `upstream-drift.yml` runs the same suite against the
+  submodules' upstream default branch instead of the pins, so a breaking change in
+  WWCP_EEBUS, Hermod, Styx or the Go references is reported the night it lands rather
+  than at the next pin bump. All three upload their `.trx` results as artifacts.
 * An `.editorconfig` modelled after the Hermod style.
 * **Acceptance:** the CI is green on both operating systems (the interoperability category
   excluded for now).

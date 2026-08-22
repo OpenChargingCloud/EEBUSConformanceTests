@@ -1,5 +1,9 @@
 ﻿# EEBUS Conformance & Interoperability Tests
 
+[![CI](https://github.com/OpenChargingCloud/EEBUSConformanceTests/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenChargingCloud/EEBUSConformanceTests/actions/workflows/ci.yml)
+[![Nightly](https://github.com/OpenChargingCloud/EEBUSConformanceTests/actions/workflows/nightly.yml/badge.svg)](https://github.com/OpenChargingCloud/EEBUSConformanceTests/actions/workflows/nightly.yml)
+[![Upstream drift](https://github.com/OpenChargingCloud/EEBUSConformanceTests/actions/workflows/upstream-drift.yml/badge.svg)](https://github.com/OpenChargingCloud/EEBUSConformanceTests/actions/workflows/upstream-drift.yml)
+
 Conformance and interoperability test suite for the **EEBUS** protocol family
 (SHIP and SPINE), defined by the [EEBUS Initiative e.V.](https://www.eebus.org).
 

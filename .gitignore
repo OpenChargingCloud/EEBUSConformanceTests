@@ -5,6 +5,8 @@ docs/specs/
 bin/
 obj/
 TestResults/
+# --results-directory of the CI test runs (ci.yml, nightly.yml)
+artifacts/
 *.user
 
 # IDE

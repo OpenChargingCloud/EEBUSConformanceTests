@@ -1,0 +1,277 @@
+name: Upstream drift
+
+# The third workflow, and the only one that does not test what this repository says it
+# tests. ci.yml and nightly.yml both build against the submodule PINS: whatever SHA
+# libs/WWCP_EEBUS, libs/Hermod, libs/Styx and the three Go modules are frozen at. That is
+# the right thing for a gate — it is reproducible, and a red run is unambiguously about
+# code somebody here wrote.
+#
+# It also means a breaking change upstream is invisible until somebody bumps a pin, and
+# then it arrives as "the pin bump broke everything" days or weeks after the commit that
+# actually did it, with a whole range of upstream commits to bisect. This workflow moves
+# every code submodule to its upstream default branch first and then runs the suite, so
+# that breakage is reported the night it lands, against a single day of upstream history.
+#
+# Why this is NOT a job inside nightly.yml, which is where it would naturally live:
+# because the two answer different questions and only one of them is about us.
+#
+#   Nightly red        -> our pinned code broke. Drop everything.
+#   Upstream drift red -> somebody else's code moved and we do not survive it yet.
+#                         Real, actionable, and queued before the next pin bump.
+#
+# Hermod and Styx are foundations under active development. They WILL break this
+# occasionally, sometimes for days at a stretch, and that is not a defect in this
+# repository. Folding that into the nightly badge would make it red for reasons nobody
+# here can fix, and a badge that is red for reasons nobody can fix stops being read —
+# which is the same argument nightly.yml already makes for keeping the LocalNetwork
+# probes non-fatal. Separate badge, separate question, both readable.
+#
+# Scheduled workflows only ever run on the default branch, and GitHub disables them after
+# 60 days without any repository activity. If this stops reporting, check that first.
+on:
+  schedule:
+    # 04:13 UTC, after nightly.yml (03:37) has had a go at the pinned state. When both are
+    # red on the same morning, read the nightly first: if the pins are broken, drift being
+    # broken too says nothing new.
+    - cron: '13 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-drift-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  dotnet-stack:
+    name: Against upstream WWCP_EEBUS/Hermod/Styx (${{ matrix.leg }})
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    # Both legs, same matrix as ci.yml and nightly.yml. A drift run on one platform would
+    # answer "does upstream still compile and pass" but not "does it still pass on
+    # Windows", and finding that out only after the pin bump is exactly the delay this
+    # workflow exists to remove.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+          - os: windows-latest
+            leg: windows-latest
+
+    steps:
+
+      # Before the checkout: the bare debian:13 image has no git, and this workflow needs
+      # it for far more than the checkout — every submodule here gets fetched and moved by
+      # hand below. See ci.yml for what the remaining packages are for.
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata
+          git config --global --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Not "submodules: recursive": libs/devices contains a path with a colon
+      # (vaillant/arotherm-vwl-75:6a), which cannot be checked out on Windows.
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 \
+            libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/ship-go libs/spine-go libs/eebus-go
+
+      - name: Checkout device recordings (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: git submodule update --init --depth 1 libs/devices
+
+      # The point of the whole workflow. Three things worth knowing about this step:
+      #
+      #  * The default branch is read from the remote (git ls-remote --symref), not
+      #    hardcoded to "master". These three do use master today — the Go references in
+      #    the job below do NOT, they default to "dev" — and a repository that renames
+      #    its default branch should make this workflow follow, not fail.
+      #  * The submodules were cloned with --depth 1, so "how many commits behind were we"
+      #    is not answerable locally without a deeper fetch. The summary reports the two
+      #    SHAs instead, which is what a bisect needs anyway.
+      #  * libs/devices is deliberately NOT moved. Those are recorded device responses —
+      #    fixture data, not code. New recordings appearing upstream is not a compatibility
+      #    signal, and drifting them would only add noise to a red morning.
+      - name: Move the .NET submodules to their upstream default branch
+        shell: bash
+        run: |
+          {
+            echo "## Upstream drift (${{ matrix.leg }})"
+            echo
+            echo "| Submodule | Pinned | Upstream | Moved |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for module in Styx Hermod WWCP_EEBUS; do
+          (
+            cd "libs/$module"
+            pinned=$(git rev-parse --short HEAD)
+            branch=$(git ls-remote --symref origin HEAD | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')
+            echo "::group::$module -> origin/$branch"
+            git fetch --depth 1 origin "$branch"
+            git checkout --force --detach FETCH_HEAD
+            git --no-pager log -1 --format='%h %ad %an: %s' --date=short
+            echo "::endgroup::"
+            upstream=$(git rev-parse --short HEAD)
+            if [ "$pinned" = "$upstream" ]; then moved="no"; else moved="**yes**"; fi
+            echo "| $module | \`$pinned\` | \`$upstream\` ($branch) | $moved |" >> "$GITHUB_STEP_SUMMARY"
+          )
+          done
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # A failure here is as much of a finding as a failed test, and a more common one:
+      # a renamed type or a changed signature in Hermod breaks the build long before it
+      # breaks an assertion. libs/Directory.Build.props keeps TreatWarningsAsErrors away
+      # from the submodules, so upstream warnings do not turn this red — only real errors.
+      - name: Build the EEBUS protocol stack
+        working-directory: libs/WWCP_EEBUS
+        run: dotnet build WWCP_EEBUS.sln --configuration Release
+
+      - name: Build
+        run: dotnet build EEBUSConformanceTests.sln --configuration Release
+
+      - name: Test the EEBUS protocol stack
+        timeout-minutes: 45
+        working-directory: libs/WWCP_EEBUS
+        run: dotnet test WWCP_EEBUS.sln --no-build --configuration Release --filter "TestCategory!=LocalNetwork" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=${{ matrix.leg }}-stack" --results-directory artifacts
+
+      # "Interop" is excluded here and drifts in the job below, which is the only one that
+      # sets up a Go toolchain. The LocalNetwork probes stay out entirely: nightly.yml
+      # already runs them non-fatally, and a probe that cannot distinguish "upstream broke
+      # discovery" from "the runner has no multicast" has nothing to contribute here.
+      - name: Conformance tests
+        timeout-minutes: 90
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory!=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=${{ matrix.leg }}-conformance" --results-directory artifacts
+
+      # See ci.yml for why TRX and why !cancelled(). It matters more here than anywhere
+      # else: the .trx is what says WHICH of the 267 cases the upstream change broke, and
+      # that is the entire content of the bug report somebody is about to write upstream.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: drift-results-${{ matrix.leg }}
+          path: |
+            artifacts/*.trx
+            libs/WWCP_EEBUS/artifacts/*.trx
+
+
+  go-references:
+    name: Against upstream ship-go/spine-go/eebus-go
+    runs-on: ubuntu-latest
+    container: debian:13
+
+    steps:
+
+      # git before the checkout, plus gcc/libc6-dev for cgo. See ci.yml for both.
+      - name: Install prerequisites (Debian container)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git gcc libc6-dev libicu76 libssl3t64 libstdc++6 tzdata
+          git config --global --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 \
+            libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/ship-go libs/spine-go libs/eebus-go libs/devices
+
+      # Only the Go modules move here — the .NET side stays pinned on purpose, so that a
+      # red run in this job means "the reference implementations changed" and nothing else.
+      # Drifting both at once would produce a failure with two candidate causes, which is
+      # the one thing a drift report must not do.
+      #
+      # Note what the remote actually answers here: enbility's default branch is "dev",
+      # not "master" — the pins in .gitmodules point into it. So this job tracks their
+      # integration branch, which is earlier than a release and exactly where a protocol
+      # change shows up first. Reading the default branch from the remote rather than
+      # hardcoding it is what makes that correct without anyone having to know it.
+      - name: Move the Go submodules to their upstream default branch
+        shell: bash
+        run: |
+          {
+            echo "## Upstream drift (Go reference implementations)"
+            echo
+            echo "| Submodule | Pinned | Upstream | Moved |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for module in ship-go spine-go eebus-go; do
+          (
+            cd "libs/$module"
+            pinned=$(git rev-parse --short HEAD)
+            branch=$(git ls-remote --symref origin HEAD | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2; exit }')
+            echo "::group::$module -> origin/$branch"
+            git fetch --depth 1 origin "$branch"
+            git checkout --force --detach FETCH_HEAD
+            git --no-pager log -1 --format='%h %ad %an: %s' --date=short
+            echo "::endgroup::"
+            upstream=$(git rev-parse --short HEAD)
+            if [ "$pinned" = "$upstream" ]; then moved="no"; else moved="**yes**"; fi
+            echo "| $module | \`$pinned\` | \`$upstream\` ($branch) | $moved |" >> "$GITHUB_STEP_SUMMARY"
+          )
+          done
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # No cache-dependency-path here, unlike ci.yml and nightly.yml: those hash the pinned
+      # go.sum files, and this job has just replaced them. Caching a key that changes every
+      # time upstream commits buys nothing and only risks a stale restore.
+      #
+      # go-version is deliberately still a floor and not "stable": if upstream raises its
+      # toolchain directive past this, the build says so instead of silently downloading a
+      # different Go.
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+
+      - name: Build the Go reference implementations
+        shell: bash
+        run: |
+          for module in ship-go spine-go eebus-go; do
+            echo "::group::building $module"
+            (cd "libs/$module" && go build ./...)
+            echo "::endgroup::"
+          done
+
+      - name: Build
+        run: dotnet build EEBUSConformanceTests.sln --configuration Release
+
+      # This is the job that earns the workflow its keep. The interoperability suite talks
+      # SHIP and SPINE to the Go implementations over loopback, so a protocol change on
+      # their side — a renamed message field, a stricter handshake, a new required
+      # extension — shows up here as a failed exchange the night it is committed, which is
+      # the only moment when the upstream commit that caused it is still obvious.
+      - name: Interoperability tests
+        timeout-minutes: 60
+        run: dotnet test EEBUSConformanceTests.sln --no-build --configuration Release --filter "TestCategory=Interop" --logger "console;verbosity=normal" --logger "trx;LogFilePrefix=interop" --results-directory artifacts
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: drift-results-interop
+          path: artifacts/*.trx
