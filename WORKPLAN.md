@@ -32,6 +32,7 @@ approval); afterwards the submodule pointer is updated here.
 |---|---|
 | **WP-W0** | ✅ done — `WWCP_EEBUS` builds standalone (Styx + Hermod only), `dotnet test` green (13 tests) |
 | **WP-W1** | ✅ done — `WWCP_EEBUS_Adapter` joins `WWCP_EEBUS.sln` and builds (0 errors); `WWCP_Core` and `WWCP_POI` added as submodules and drifted. Reverses WP-W0's **variant A**. The first compiler run this project ever had found 30 errors in four families, 34 more behind them, and two defects left deliberately warning — still **untested** |
+| **WP-W2** | ⬜ open — **the EEBUS-to-WWCP bridge, and a correction to WP-W1.** The fix WP-W1 named for its own first defect is not available: the overlay base classes are built oppositely (the client inherits Hermod's, the server wraps one), and `Reachability`'s two interfaces are implemented by **no class** in WWCP_Core or WWCP_EEBUS, so the adapter's routing is unreachable regardless. Making them implementable means JSON send methods on a binary transport — a design decision, not a repair. Nothing changed in the adapter |
 | **WP00** | ✅ done — `EEBUSConformanceTests.sln`, CLI, conformance and interoperability test projects, GitHub Actions CI; `dotnet test` green (5 tests + 2 interoperability tests reporting "inconclusive" without Go) |
 | **WP01** | ✅ done — complete SHIP message set (including init/CMI, the PIN family, `accessMethodsRequest`), **EEBUSJSON** verified against the golden vectors of ship-go, `SHIPFrame` framing, `SHIPMessageExchangeStates` (0–39) |
 | **WP02** | ✅ done — `SKI` value type, ECDSA P-256 certificates with subject key identifier, SHA-256 fingerprint, SHIP TLS profile; a real TLS handshake with mutual authentication in the tests; ADR `docs/adr/0001-tls-cipher-suites.md` |
@@ -581,10 +582,13 @@ reaches the errors behind them.
    nothing.** They filter lists of `OverlayWebSocketClient`/`OverlayWebSocketServer` for
    `SHIPWebSocketClient`/`SHIPWebSocketServer`, which descend from Hermod's
    `WebSocketClient`/`WebSocketServer` — unrelated hierarchies, so the filter matches
-   nothing whatever is registered. The compiler states this precisely (CS0184, CA2021). The
-   real fix is for the SHIP client and server to descend from
-   `AOverlayWebSocketClient`/`AOverlayWebSocketServer`, which is what a node in this
-   overlay expects to be handed; that is a design change with no test to hold it down.
+   nothing whatever is registered. The compiler states this precisely (CS0184, CA2021).
+   This entry first named the fix as "let the SHIP client and server descend from
+   `AOverlayWebSocketClient`/`AOverlayWebSocketServer`". That is wrong, and why it is
+   wrong is → **WP-W2**: the two overlay base classes are built oppositely, and the two
+   interfaces `Reachability` wants have no implementation anywhere, so the routing stays
+   dead whatever the SHIP classes descend from. Nothing in the adapter was changed on the
+   strength of the original claim.
 2. Four crypto methods on `AEEBUSNode` **hide non-virtual base members** (CS0108) and return
    a hard-coded key. `new` would silence the warning by asserting the hiding is intended,
    and that is exactly what is unknown.
@@ -603,6 +607,74 @@ its only use of the variable was commented out — now logs.
   is the entire claim, and the 24 events it declares and never raises — 48 `CS0067`
   warnings, their raise sites still sitting commented out — are the next thing a reader
   should expect to meet.
+
+### WP-W2 — the EEBUS-to-WWCP bridge *(L; needs a decision before any code)* ⬜ **open**
+
+> **This work package exists because the fix WP-W1 proposed for its own first defect turned
+> out not to be available.** WP-W1 wrote down "the real fix is for the SHIP client and
+> server to descend from `AOverlayWebSocketClient`/`AOverlayWebSocketServer`". Examined,
+> that is wrong twice over, and nothing in the adapter was changed on the strength of it.
+
+**Why deriving does not work.** The two overlay base classes are built oppositely:
+
+```
+AOverlayWebSocketClient : WebSocketClient, IEventSender    ← derives from Hermod's client
+AOverlayWebSocketServer : IEventSender
+    private readonly WebSocketServer webSocketServer;      ← holds one, derives from none
+```
+
+On the client side the change would genuinely be an insertion into an existing chain. On
+the server side `AOverlayWebSocketServer` keeps a Hermod `WebSocketServer` in a private
+field and re-exposes its surface (`IPAddress`, `IPPort`, `IsRunning`,
+`WebSocketConnections`, …). Deriving from it means `SHIPWebSocketServer` stops being a
+Hermod server: every `override`, the `base.OnValidate*` wiring and `SendBinaryMessage`
+would have to move onto the wrapped instance. That is a rewrite of exactly the TLS and
+handshake path WP02 and WP05 were built on, and no test covers it.
+
+**Why it would not help even then.** `Reachability` declares
+
+```csharp
+public IWebSocketClient?  EEBusWebSocketClient  { get; }
+public IWebSocketServer?  EEBusWebSocketServer  { get; }
+```
+
+and, being in `WWCP.OverlayNetworking`, those are **that namespace's own** interfaces, not
+Hermod's. No class in WWCP_Core or in WWCP_EEBUS implements either of them —
+`AOverlayWebSocketClient` included — and `WWCP.OverlayNetworking.IWebSocketServer` extends
+Hermod's `IWebSocketServer`, which no Hermod class implements either. Both properties can
+therefore only ever be null, and the eight `if (reachability.EEBusWebSocket… is not null)`
+branches in `EEBUSAdapter.cs` are unreachable regardless of what the SHIP classes descend
+from. The cause is not in the adapter.
+
+**What the work package therefore is.** Satisfying those interfaces means implementing
+`SendJSONRequest`, `SendJSONResponse`, `SendJSONRequestError` and `SendJSONResponseError`
+on a transport that is **binary**, plus `ProcessWebSocketTextFrame` /
+`ProcessWebSocketBinaryFrame`. That is not a repair, it is the design of the bridge, and it
+decides a JSON message shape for EEBUS that SHIP does not define. Three questions have to
+be answered before any of it is written:
+
+1. **Does EEBUS get a JSON envelope at all, or does the overlay learn to carry binary?**
+   SHIP's data phase is binary by specification. The OCPP-shaped `JSONRequestMessage` /
+   `JSONResponseMessage` pair is what `WWCP.OverlayNetworking` assumes everywhere. Either
+   EEBUS payloads are wrapped in that envelope — in which case the envelope is ours to
+   define and to keep stable — or `WWCP_OverlayNetworking` grows a binary-only path and the
+   four JSON methods are explicitly unsupported on an EEBUS node.
+2. **Which side changes?** `Reachability` and the two unimplemented interfaces live in
+   WWCP_Core. Making them implementable may be a change there rather than here, and
+   WWCP_Core is a submodule shared with other projects.
+3. **Inheritance or composition for the server?** If the bridge is built, the question from
+   the first half of this entry returns, and the answer that keeps the SHIP server a Hermod
+   server is composition — the adapter holding a SHIP server rather than being one.
+
+**Until it is decided**, the adapter stays as WP-W1 left it: compiling, untested, and with
+four warnings standing (CS0184 ×2, CA2021 ×2) which GitHub surfaces as annotations on every
+run of both repositories. That is deliberate. A `new` or a suppression would assert an
+intent nobody holds, and the warnings are a better record of an open decision than a
+comment is.
+
+* **Not blocked by this:** the first test against the adapter, and clearing out the 24
+  events it declares and never raises (48 × `CS0067`, raise sites still commented out).
+  Neither needs this decision.
 
 ### WP00 — the test bench skeleton and CI *(S; in parallel with WP-W0)* ✅ **done**
 
