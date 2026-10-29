@@ -310,3 +310,118 @@ jobs:
           path: |
             artifacts/*.trx
             libs/WWCP_EEBUS/artifacts/*.trx
+
+
+  report:
+    name: Report the verdict
+    needs: [ dotnet-stack, go-references ]
+    # always(), because the whole point is to react to the jobs above having failed.
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      # issues: to open, update and close the report. actions: to count how long this has
+      # been red. Nothing else — no write access to the repository contents.
+      issues: write
+      actions: read
+
+    steps:
+
+      # Why this job exists at all: on 13 October this workflow was green, on the 14th it
+      # went red on a Hermod commit from the day before, and it then stayed red for
+      # fifteen consecutive runs because its only output was a badge nobody walks past.
+      # The diagnosis, once somebody looked, took minutes and the fix was three lines.
+      # What the delay cost was two weeks of upstream history between cause and
+      # discovery — exactly what this workflow exists to prevent, and could not, for want
+      # of anybody being told.
+      #
+      # So: one issue, opened on the first red run and closed on the next green one. Not a
+      # comment per run, which over those fifteen days would have been fifteen comments
+      # and read as noise. The body is rewritten instead, so it always shows the latest
+      # run and how long this has been going on. GITHUB_TOKEN is enough; no secrets.
+      - name: Open, update or close the drift issue
+        env:
+          GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          REPO:      ${{ github.repository }}
+          RUN_URL:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STACK:     ${{ needs.dotnet-stack.result }}
+          GO:        ${{ needs.go-references.result }}
+          EVENT:     ${{ github.event_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # A cancelled run says nothing about upstream, so it must neither open nor close
+          # anything. Only an outright failure counts as red.
+          if [ "$STACK" = "cancelled" ] || [ "$GO" = "cancelled" ]; then
+            echo "cancelled - leaving the issue alone"
+            exit 0
+          fi
+
+          # if-blocks rather than "[ test ] && red=...": under set -e an AND-list whose
+          # test is false returns 1 and would take this whole step down with it, so a
+          # green run would have failed here instead of closing the issue.
+          red=""
+          if [ "$STACK" = "failure" ]; then
+            red="$red dotnet-stack"
+          fi
+          if [ "$GO" = "failure" ]; then
+            red="$red go-references"
+          fi
+
+          # Idempotent: the label may or may not exist yet, and either is fine.
+          gh label create upstream-drift --repo "$REPO" --color B60205 \
+             --description "The build against the upstream submodule branches is failing" \
+             >/dev/null 2>&1 || true
+
+          number=$(gh issue list --repo "$REPO" --label upstream-drift --state open \
+                     --limit 1 --json number --jq '.[0].number // empty')
+
+          if [ -z "$red" ]; then
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --repo "$REPO" --body "Green again. Run: $RUN_URL"
+              gh issue close   "$number" --repo "$REPO" --reason completed
+              echo "closed #$number"
+            else
+              echo "green, nothing open"
+            fi
+            exit 0
+          fi
+
+          # How many runs in a row have failed. The current run has no conclusion yet, so
+          # it is filtered out and added back as the +1 - hence "at least" in the body,
+          # and "length" for the case where no success appears in the window at all.
+          streak=$(gh run list --repo "$REPO" --workflow upstream-drift.yml --limit 50 \
+                     --json conclusion \
+                     --jq '[.[].conclusion | select(. != null)] | (index("success") // length) + 1')
+
+          {
+            printf 'The suite no longer builds or passes against the upstream default branch of its submodules.\n\n'
+            printf '**Failing jobs:**\n\n'
+            for job in $red; do
+              case "$job" in
+                dotnet-stack)  printf -- '- `dotnet-stack` — WWCP_EEBUS / Hermod / Styx\n' ;;
+                go-references) printf -- '- `go-references` — ship-go / spine-go / eebus-go\n' ;;
+              esac
+            done
+            printf '\n| | |\n|---|---|\n'
+            printf '| Latest run | %s |\n' "$RUN_URL"
+            printf '| Trigger | %s |\n' "$EVENT"
+            printf '| Failing runs in a row | at least %s |\n\n' "$streak"
+            printf 'This workflow builds against each submodule'"'"'s upstream branch instead of its pinned\n'
+            printf 'commit, so a red run means somebody else'"'"'s code moved and we do not survive it yet.\n'
+            printf 'It is not a defect in this repository and it blocks nothing — but the longer it stays\n'
+            printf 'red, the more upstream history ends up between the cause and whoever goes looking.\n\n'
+            printf 'The per-job step summaries of the run say which submodules moved and to which commit;\n'
+            printf 'the `.trx` artifacts name the individual tests.\n\n'
+            printf 'Opened by `.github/workflows/upstream-drift.yml`. It closes itself on the next green\n'
+            printf 'run, and rewrites this body rather than commenting on every further red one.\n'
+          } > body.md
+
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$REPO" --body-file body.md
+            echo "updated #$number (streak $streak)"
+          else
+            gh issue create --repo "$REPO" --label upstream-drift \
+               --title "Upstream drift: the suite does not survive its submodules' upstream branches" \
+               --body-file body.md
+          fi
