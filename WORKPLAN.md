@@ -31,6 +31,7 @@ approval); afterwards the submodule pointer is updated here.
 | WP | Status |
 |---|---|
 | **WP-W0** | ✅ done — `WWCP_EEBUS` builds standalone (Styx + Hermod only), `dotnet test` green (13 tests) |
+| **WP-W1** | ✅ done — `WWCP_EEBUS_Adapter` joins `WWCP_EEBUS.sln` and builds (0 errors); `WWCP_Core` and `WWCP_POI` added as submodules and drifted. Reverses WP-W0's **variant A**. The first compiler run this project ever had found 30 errors in four families, 34 more behind them, and two defects left deliberately warning — still **untested** |
 | **WP00** | ✅ done — `EEBUSConformanceTests.sln`, CLI, conformance and interoperability test projects, GitHub Actions CI; `dotnet test` green (5 tests + 2 interoperability tests reporting "inconclusive" without Go) |
 | **WP01** | ✅ done — complete SHIP message set (including init/CMI, the PIN family, `accessMethodsRequest`), **EEBUSJSON** verified against the golden vectors of ship-go, `SHIPFrame` framing, `SHIPMessageExchangeStates` (0–39) |
 | **WP02** | ✅ done — `SKI` value type, ECDSA P-256 certificates with subject key identifier, SHA-256 fingerprint, SHIP TLS profile; a real TLS handshake with mutual authentication in the tests; ADR `docs/adr/0001-tls-cipher-suites.md` |
@@ -70,6 +71,13 @@ tests — exactly what this repository is for):
 Decisions taken in WP-W0 (details in the work package): **variant A** (core without
 `WWCP_Core`, adapter parked), `customData` removed from all SHIP wire types, one dedicated
 `Version` class per project stating the implemented specification versions.
+
+> **Variant A was reversed in WP-W1.** `WWCP_Core` and `WWCP_POI` are submodules now and
+> the adapter is in the solution. Variant A was right while the core was being built — it
+> is what kept WP01–WP09 free of `WWCP_Core` — but it also put this one project beyond the
+> reach of every compiler for the whole of that time, and that part was never weighed. The
+> `Version` decision in the same line is what the adapter then tripped over: it still asked
+> for the shared `EEBUS.Version` that this split had removed.
 
 Open points for Achim: both repositories have `commit.gpgsign=true`, so commits have to be
 signed by Achim — the WP-W0 changes are **staged** on the submodule branch `wp-w0-refactoring`.
@@ -116,7 +124,9 @@ Guiding principles:
 | `libs/eebus-go` | Use case layer + service (Go, enbility) | `service/` (assembly of SHIP + SPINE), `api/configuration.go`, `usecases/` (`cs/lpc`, `cs/lpp`, `eg/lpc`, `eg/lpp`, `cem/opev`, `cem/oscev`, `cem/evcc`, `cem/evcem`, `cem/evsecc`, `cem/evsoc`, `cem/cevc`, `cem/ohpcf`, `cem/vabd`, `cem/vapd`, `ma/mpc`, `ma/mgcp`, `ma/mdt`, `mu/mpc`, `gcp/mgcp`, `usecase/usecase.go` = UseCaseBase), `features/` (client and server feature helpers), `examples/` (`hems`, `evse`, `controlbox`, `ced`, `heatpump`, `remote`) |
 | `libs/devices` | **Recorded answers of real devices** (MIT): `NodeManagementDetailedDiscoveryData` + `NodeManagementUseCaseData` of series devices (Elli, EVCC, Kostal, Porsche PMCC, SMA, Spelsberg, Vaillant, Viessmann) | per device `device.json`, `discovery-data.json`, `usecase-data.json`; `schema/` (JSON schemas), `devices.json`/`usecases.json` (aggregates). **Windows note:** `vaillant/arotherm-vwl-75:6a/` contains a colon → cannot be checked out; the content is readable via `git -C libs/devices show "HEAD:vaillant/arotherm-vwl-75:6a/discovery-data.json"` (which is why the submodule is set to `ignore = dirty`) |
 | `libs/devices-app` | GUI test tool (Go + Vue 3, MIT): pairing through a web UI, shows the SPINE data, use cases and features of the communication partner | `main.go` (HTTP :7050, EEBUS :4815, automatic certificates); an ideal **manual peer** for our server |
-| `libs/WWCP_EEBUS` | **Target repository of the stack** (C#, Apache-2.0, net10.0), namespace `cloud.charging.open.protocols.EEBUS.SHIP/.SPINE` | `WWCP_EEBUS_SHIP/` (SHIP messages as TryParse/ToJSON types, `PredefinedStrings/`, OCPP-like `EEBUSAdapter/`, `WebSocket/SHIPWebSocketClient/-Server.cs`, `AEEBUSNode.cs`), `WWCP_EEBUS_SPINE/` (only `Version.cs` — empty), both `*_Tests/` are placeholders. **Note:** the csproj expects `WWCP_Core` siblings (→ WP-W0) |
+| `libs/WWCP_EEBUS` | **Target repository of the stack** (C#, Apache-2.0, net10.0), namespace `cloud.charging.open.protocols.EEBUS.SHIP/.SPINE` | `WWCP_EEBUS_SHIP/` (SHIP messages as TryParse/ToJSON types, `PredefinedStrings/`, OCPP-like `EEBUSAdapter/`, `WebSocket/SHIPWebSocketClient/-Server.cs`, `AEEBUSNode.cs`), `WWCP_EEBUS_SPINE/` (only `Version.cs` — empty), both `*_Tests/` are placeholders. **Note:** the csproj expects `WWCP_Core` siblings — parked in WP-W0, resolved in WP-W1, where they became submodules |
+| `libs/WWCP_Core` | **WWCP core + overlay networking** (C#, Apache-2.0), the foundation `WWCP_EEBUS_Adapter` bridges onto (→ WP-W1) | `WWCP_Core/` (roaming network, charging station operator, EVSE, charging sessions), `WWCP_CoreData/`, `WWCP_OverlayNetworking/` (`AOverlayNetworkingNode`, `Reachability`, the JSON/binary request and response messages, `IWebSocketClient`/`IWebSocketServer`). `WWCP_HTTPAPI`/`WWCP_WebAPI`/`WWCP_Node` are **not** in the adapter's dependency chain, which is what keeps its Node/npm/TypeScript build steps out of our builds |
+| `libs/WWCP_POI` | **Points of interest / e-mobility identifiers** (C#, Apache-2.0), reached by `WWCP_Core` itself (→ WP-W1) | `WWCP_POI2/` is the one project in the chain: `EMobilityAccount_Id`, `RoamingNetwork_Id`, the transparency software types. Without it `WWCP_Core` does not compile — which is what an earlier attempt's 3168 errors had been about |
 
 ### 1.2 Specifications — **available locally below `docs/specs/`!**
 
@@ -478,9 +488,121 @@ An inventory of `libs/WWCP_EEBUS` (2026-07-26) and the refactoring tasks:
   (A) the SHIP/SPINE/UseCases core **standalone** (Styx and Hermod only), with the WWCP
   integration as a separate adapter project later ↔ (B) keep the OverlayNetworking foundation
   and carry `WWCP_Core` along as another submodule. The plan assumes **A**.
+  *(A was chosen and held through WP01–WP09. **WP-W1 moved to B for the adapter alone:**
+  `WWCP_Core` and `WWCP_POI` are submodules, the core itself still depends on neither.)*
 * **Acceptance:** `dotnet build WWCP_EEBUS.sln` green **inside this repository** (with only
   `libs/Styx` and `libs/Hermod` as neighbours); both test projects run; the commit within the
   submodule is prepared and pushed after Achim's approval.
+
+### WP-W1 — the adapter joins the solution *(M; after WP09)* ✅ **done**
+
+> **Result:** `WWCP_EEBUS_Adapter` is part of `WWCP_EEBUS.sln` and builds — **0 errors** —
+> on both CI legs of both repositories. `WWCP_Core` and `WWCP_POI` are submodules
+> `libs/WWCP_Core` and `libs/WWCP_POI` and are checked out beside Hermod and Styx. The
+> stack suite is unchanged and green (108 SPINE + 115 SHIP + 175 use case tests, 398 with
+> `LocalNetwork` excluded).
+
+This reverses the architectural decision of WP-W0. **Variant A** — core without
+`WWCP_Core`, adapter parked — was the right call then and is recorded as such; what it
+also did, and what nobody weighed at the time, was take this project out of every solution
+and therefore out of reach of every compiler. It stayed there for the whole of WP01–WP09.
+In that time it was edited exactly once, by a repository-wide `EEBus` → `EEBUS` rename, and
+nothing noticed that the rename had covered only one side of a cross-repository property
+name, because nothing could.
+
+**The dependency chain turned out to be two repositories deep, not the open-ended tree it
+looked like.** An earlier attempt had built `WWCP_Core` on its own, got 3168 errors, none
+of them in the adapter, and concluded the chain was unknowable. Reading the
+`ProjectReference` graph instead of building it gives the answer in full:
+
+```
+WWCP_EEBUS_Adapter
+├─ Hermod, Styx, WWCP_EEBUS_SHIP            ← already here
+├─ WWCP_Core/WWCP_Core          ← new ──┬── WWCP_POI/WWCP_POI2   ← new
+│                                       └── WWCP_Core/WWCP_CoreData
+└─ WWCP_Core/WWCP_OverlayNetworking ─────┘
+```
+
+`WWCP_POI2` is where `EMobilityAccount_Id`, `RoamingNetwork_Id` and the transparency
+software types live, which is exactly what those 3168 errors were about. With it present
+the count fell to 30, all of them inside the adapter. `WWCP_HTTPAPI`, `WWCP_WebAPI` and
+`WWCP_Node` are **not** in the chain, which is worth knowing: they are what pulls in
+`WWCP_Core`'s Node/npm/TypeScript build machinery, and none of it is triggered here.
+
+**What the first compiler run found** — thirty errors in four families:
+
+| Family | Errors | What it was |
+|---|---|---|
+| `IEEBUSWebSocketAdapter{IN,OUT,FORWARD}` | 9 | three interfaces the classes declare they implement, existing nowhere in any repository |
+| `On*Delegate` | 11 | seven delegate types for the adapter's events, likewise nowhere |
+| `EEBUS.Version` | 2 | WP-W0 gave each project its own `Version` class; the adapter still asked for the shared one |
+| Hermod API drift | 8 | `ServerThread*Delegate` and `ConnectionIdBuilder` had moved namespace; `ProcessText/BinaryMessage` had changed shape |
+
+Then, once those unblocked type checking, 34 more in three further families — which is the
+normal shape of this work, not a setback: a file that cannot resolve its own types never
+reaches the errors behind them.
+
+| Family | What it was |
+|---|---|
+| `Reachability.EEBUSWebSocket{Client,Server}` | **the half-finished rename.** `WWCP_Core` spells these `EEBusWebSocketClient`/`EEBusWebSocketServer`. The July rename renamed the call sites here and could not reach the declarations, which live in another repository |
+| the two `base(...)` calls | long **positional** argument lists into Hermod's `WebSocketServer`/`WebSocketClient`, both slid out of alignment — the client's by far enough to offer a `LogfileCreatorDelegate` to a parameter wanting `IEnumerable<SslApplicationProtocol>` |
+| `HTTPResponse.Builder()` | the parameterless form is gone; a response is built from the request it answers |
+
+**Decisions worth recording:**
+
+* **Both `base(...)` lists are now named, not positional.** This is the actual fix for that
+  family. A positional list slides silently whenever the constructor it calls changes
+  shape, and what the compiler reports then — "argument 11 wants a `UInt32?`" — names
+  neither the cause nor the remedy. A named argument whose parameter goes away is an error
+  that says which one.
+* **Four parameters were dropped** from `SHIPWebSocketServer`'s constructor, because the
+  base has nowhere left to put them: the three `ServerThread*` ones (the delegate types
+  still exist in `Hermod.TCP`, but a WebSocket server no longer runs a thread per
+  connection) and `ConnectionTimeout`, whose job the `Receive`/`SendTimeout` pair now does.
+  Nothing anywhere constructs these two classes, so this breaks no caller.
+* **`ProcessBinaryMessage` returns `Task`, so it sends its own answer.** Hermod awaits it
+  and discards the result; the former return value had no reader. The response now goes out
+  on the connection, which is the idiom `SHIPWebSocketEndpoint` in the live SHIP project
+  already follows.
+* **Three delegate signatures are inferred and say so.** Four of the seven were read
+  straight off their own invocation sites. The three on `EEBUSWebSocketAdapterFORWARD` have
+  no invocation site — nothing raises them — so their shape was taken from the four that
+  do, and `EEBUSAdapter/Delegates.cs` records that at the point of declaration rather than
+  leaving a reader to assume it came from an upstream original.
+* **`WWCP_Core` and `WWCP_POI` are drifted** by `upstream-drift.yml` alongside Styx, Hermod
+  and WWCP_EEBUS. Without that they would rot exactly as Hermod did for fifteen nights.
+* **The adapter is deliberately not pinned in the WWCP_EEBUS repository's own CI.** Like
+  Hermod and Styx there, `WWCP_Core` and `WWCP_POI` are checked out at master, so a
+  breaking change below turns that workflow red at once.
+
+**Two defects were found and deliberately left warning rather than fixed:**
+
+1. `AEEBUSNode.EEBUSWebSocketClients` / `.EEBUSWebSocketServers` **can only ever return
+   nothing.** They filter lists of `OverlayWebSocketClient`/`OverlayWebSocketServer` for
+   `SHIPWebSocketClient`/`SHIPWebSocketServer`, which descend from Hermod's
+   `WebSocketClient`/`WebSocketServer` — unrelated hierarchies, so the filter matches
+   nothing whatever is registered. The compiler states this precisely (CS0184, CA2021). The
+   real fix is for the SHIP client and server to descend from
+   `AOverlayWebSocketClient`/`AOverlayWebSocketServer`, which is what a node in this
+   overlay expects to be handed; that is a design change with no test to hold it down.
+2. Four crypto methods on `AEEBUSNode` **hide non-virtual base members** (CS0108) and return
+   a hard-coded key. `new` would silence the warning by asserting the hiding is intended,
+   and that is exactly what is unknown.
+
+Neither is suppressed. Until somebody decides, the compiler repeating itself on every build
+is the most reliable record of them there is. Two smaller things *were* fixed, both
+verifiable: `HandleErrors` now `override`s the base methods it was shadowing (the base is
+`virtual` and calls them itself, so the shadowing meant the node's handler was never
+reached), and a `catch` on the incoming message path that swallowed every exception —
+its only use of the variable was commented out — now logs.
+
+* **Acceptance:** `dotnet build WWCP_EEBUS.sln` green with 0 errors; the stack suite
+  unchanged; `EEBUSConformanceTests.sln` unchanged and green; all three workflows of this
+  repository and both of WWCP_EEBUS check out the two new siblings.
+* **Explicitly NOT in this work package:** any test against the adapter. It compiles. That
+  is the entire claim, and the 24 events it declares and never raises — 48 `CS0067`
+  warnings, their raise sites still sitting commented out — are the next thing a reader
+  should expect to meet.
 
 ### WP00 — the test bench skeleton and CI *(S; in parallel with WP-W0)* ✅ **done**
 
@@ -509,8 +631,8 @@ An inventory of `libs/WWCP_EEBUS` (2026-07-26) and the refactoring tasks:
   tests (`actions/setup-go`). `nightly.yml` repeats that on a schedule and adds the
   `LocalNetwork` tests non-fatally. `upstream-drift.yml` runs the same suite against the
   submodules' upstream default branch instead of the pins, so a breaking change in
-  WWCP_EEBUS, Hermod, Styx or the Go references is reported the night it lands rather
-  than at the next pin bump. All three upload their `.trx` results as artifacts.
+  WWCP_EEBUS, Hermod, Styx, WWCP_Core, WWCP_POI or the Go references is reported the
+  night it lands rather than at the next pin bump. All three upload their `.trx` results as artifacts.
 * An `.editorconfig` modelled after the Hermod style.
 * **Acceptance:** the CI is green on both operating systems (the interoperability category
   excluded for now).

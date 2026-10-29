@@ -1,4 +1,4 @@
-name: Upstream drift
+﻿name: Upstream drift
 
 # The third workflow, and the only one that does not test what this repository says it
 # tests. ci.yml and nightly.yml both build against the submodule PINS: whatever SHA
@@ -83,6 +83,7 @@ jobs:
         run: |
           git submodule update --init --depth 1 \
             libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/WWCP_Core libs/WWCP_POI \
             libs/ship-go libs/spine-go libs/eebus-go
 
       - name: Checkout device recordings (Linux only)
@@ -93,7 +94,7 @@ jobs:
       # The point of the whole workflow. Three things worth knowing about this step:
       #
       #  * The default branch is read from the remote (git ls-remote --symref), not
-      #    hardcoded to "master". These three do use master today — the Go references in
+      #    hardcoded to "master". These five do use master today — the Go references in
       #    the job below do NOT, they default to "dev" — and a repository that renames
       #    its default branch should make this workflow follow, not fail.
       #  * The submodules were cloned with --depth 1, so "how many commits behind were we"
@@ -112,7 +113,7 @@ jobs:
             echo "|---|---|---|---|"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          for module in Styx Hermod WWCP_EEBUS; do
+          for module in Styx Hermod WWCP_EEBUS WWCP_Core WWCP_POI; do
           (
             cd "libs/$module"
             pinned=$(git rev-parse --short HEAD)
@@ -193,6 +194,7 @@ jobs:
         run: |
           git submodule update --init --depth 1 \
             libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/WWCP_Core libs/WWCP_POI \
             libs/ship-go libs/spine-go libs/eebus-go libs/devices
 
       # Only the Go modules move here — the .NET side stays pinned on purpose, so that a

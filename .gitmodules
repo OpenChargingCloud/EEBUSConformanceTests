@@ -23,3 +23,9 @@
 [submodule "libs/WWCP_EEBUS"]
 	path = libs/WWCP_EEBUS
 	url = https://github.com/OpenChargingCloud/WWCP_EEBUS.git
+[submodule "libs/WWCP_Core"]
+	path = libs/WWCP_Core
+	url = https://github.com/OpenChargingCloud/WWCP_Core.git
+[submodule "libs/WWCP_POI"]
+	path = libs/WWCP_POI
+	url = https://github.com/OpenChargingCloud/WWCP_POI.git

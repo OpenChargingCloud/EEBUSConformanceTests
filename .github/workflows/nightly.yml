@@ -1,4 +1,4 @@
-name: Nightly
+﻿name: Nightly
 
 # The counterpart to ci.yml. That workflow gates every push and deliberately leaves two
 # things out: the "LocalNetwork" tests of the protocol stack, which need multicast and a
@@ -63,6 +63,7 @@ jobs:
         run: |
           git submodule update --init --depth 1 \
             libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/WWCP_Core libs/WWCP_POI \
             libs/ship-go libs/spine-go libs/eebus-go
 
       - name: Checkout device recordings (Linux only)
@@ -169,6 +170,7 @@ jobs:
         run: |
           git submodule update --init --depth 1 \
             libs/Styx libs/Hermod libs/WWCP_EEBUS \
+            libs/WWCP_Core libs/WWCP_POI \
             libs/ship-go libs/spine-go libs/eebus-go libs/devices
 
       - name: Setup .NET
