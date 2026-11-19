@@ -98,7 +98,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Restore
         run: dotnet restore EEBUSConformanceTests.sln
@@ -186,7 +186,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       # ship-go/spine-go/eebus-go require Go 1.24 (spine-go and eebus-go even pin
       # "toolchain go1.24.4"), so anything older would force a toolchain download.

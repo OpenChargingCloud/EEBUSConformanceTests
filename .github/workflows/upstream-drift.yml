@@ -132,7 +132,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       # A failure here is as much of a finding as a failed test, and a more common one:
       # a renamed type or a changed signature in Hermod breaks the build long before it
@@ -236,7 +236,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       # cache: false, unlike ci.yml and nightly.yml. Those hash the pinned go.sum files;
       # this job has just replaced them, so a key derived from them would change on every
@@ -389,12 +389,13 @@ jobs:
             exit 0
           fi
 
-          # How many runs in a row have failed. The current run has no conclusion yet, so
-          # it is filtered out and added back as the +1 - hence "at least" in the body,
-          # and "length" for the case where no success appears in the window at all.
+          # How many runs in a row have failed. The current run has no conclusion yet - gh
+          # reports that as an empty string, not as null - so it is filtered out and added
+          # back as the +1. "at least" in the body is for the --limit window, and "length"
+          # for the case where no success appears in that window at all.
           streak=$(gh run list --repo "$REPO" --workflow upstream-drift.yml --limit 50 \
                      --json conclusion \
-                     --jq '[.[].conclusion | select(. != null)] | (index("success") // length) + 1')
+                     --jq '[.[].conclusion | select(. != null and . != "")] | (index("success") // length) + 1')
 
           {
             printf 'The suite no longer builds or passes against the upstream default branch of its submodules.\n\n'

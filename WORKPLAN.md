@@ -88,6 +88,10 @@ signed by Achim — the WP-W0 changes are **staged** on the submodule branch `wp
 login PATH via Debian's `~/.profile`). ship-go, spine-go and eebus-go build there without
 errors, and WSL already has the **.NET 10 SDK** (10.0.302) — so the interoperability tests run
 locally, entirely within WSL (verified: 2/2 green).
+*Since the move to .NET 11 (2026-11-19):* the SDK that counts in WSL is the one on the
+default PATH, `/usr/bin/dotnet` with 11.0.100. `~/.dotnet` there holds only 10.0.400, which
+cannot target `net11.0`; a run of the interoperability tests in WSL after the move has not
+been made yet.
 **Important:** a Go toolchain inside WSL cannot sensibly be driven from a test run on Windows —
 the Go peer would live in the WSL network namespace, which breaks mDNS discovery and the
 direction where the Go peer connects to us. Therefore, for WP12: **always run the
@@ -119,13 +123,13 @@ Guiding principles:
 | Path | Content | Most important files/folders |
 |---|---|---|
 | `libs/Styx` | Base library (Illias, CLI, …), Apache-2.0 | `Styx/Illias/` (helpers, `Time/Timestamp.cs`), `Styx/CLI/` |
-| `libs/Hermod` | Networking stack, Apache-2.0, net10.0 | `Hermod/HTTP1/WebSocket/` (client + server), `Hermod/DNS/` (client + server, multicast capable, SRV/PTR/TXT), `Hermod/TLS/`, `Hermod/PKI/`, `Hermod/Logging/` |
+| `libs/Hermod` | Networking stack, Apache-2.0, net11.0 | `Hermod/HTTP1/WebSocket/` (client + server), `Hermod/DNS/` (client + server, multicast capable, SRV/PTR/TXT), `Hermod/TLS/`, `Hermod/PKI/`, `Hermod/Logging/` |
 | `libs/ship-go` | SHIP 1.0.1 reference (Go, enbility) | `model/model.go` (SHIP messages), `ship/` (state machines `hs_init.go`, `hs_hello.go`, `hs_prot.go`, `hs_pin.go`, `hs_access.go`, timers in `ship/types.go`), `mdns/mdns.go` (TXT records), `cert/cert.go` (TLS/SKI), `hub/` (double connections, pairing), `ws/` (framing), `docs/SPEC_COMPLIANCE.md`, `ARCHITECTURE.md`, `examples/` |
 | `libs/spine-go` | SPINE 1.3.0 reference (Go, enbility) | `model/` (~26k lines of data model including `datagram.go`, `commandframe.go`, `commondatatypes.go`, `PRIMARYKEY_TAG_GUIDELINES.md`, `UPDATE_SYSTEM_GUIDE.md`), `spine/` (DeviceLocal/Remote, NodeManagement, subscription/binding/heartbeat managers, `send.go`), `spine/testdata/` + `integration_tests/testdata/` (golden JSON!) |
 | `libs/eebus-go` | Use case layer + service (Go, enbility) | `service/` (assembly of SHIP + SPINE), `api/configuration.go`, `usecases/` (`cs/lpc`, `cs/lpp`, `eg/lpc`, `eg/lpp`, `cem/opev`, `cem/oscev`, `cem/evcc`, `cem/evcem`, `cem/evsecc`, `cem/evsoc`, `cem/cevc`, `cem/ohpcf`, `cem/vabd`, `cem/vapd`, `ma/mpc`, `ma/mgcp`, `ma/mdt`, `mu/mpc`, `gcp/mgcp`, `usecase/usecase.go` = UseCaseBase), `features/` (client and server feature helpers), `examples/` (`hems`, `evse`, `controlbox`, `ced`, `heatpump`, `remote`) |
 | `libs/devices` | **Recorded answers of real devices** (MIT): `NodeManagementDetailedDiscoveryData` + `NodeManagementUseCaseData` of series devices (Elli, EVCC, Kostal, Porsche PMCC, SMA, Spelsberg, Vaillant, Viessmann) | per device `device.json`, `discovery-data.json`, `usecase-data.json`; `schema/` (JSON schemas), `devices.json`/`usecases.json` (aggregates). **Windows note:** `vaillant/arotherm-vwl-75:6a/` contains a colon → cannot be checked out; the content is readable via `git -C libs/devices show "HEAD:vaillant/arotherm-vwl-75:6a/discovery-data.json"` (which is why the submodule is set to `ignore = dirty`) |
 | `libs/devices-app` | GUI test tool (Go + Vue 3, MIT): pairing through a web UI, shows the SPINE data, use cases and features of the communication partner | `main.go` (HTTP :7050, EEBUS :4815, automatic certificates); an ideal **manual peer** for our server |
-| `libs/WWCP_EEBUS` | **Target repository of the stack** (C#, Apache-2.0, net10.0), namespace `cloud.charging.open.protocols.EEBUS.SHIP/.SPINE` | `WWCP_EEBUS_SHIP/` (SHIP messages as TryParse/ToJSON types, `PredefinedStrings/`, OCPP-like `EEBUSAdapter/`, `WebSocket/SHIPWebSocketClient/-Server.cs`, `AEEBUSNode.cs`), `WWCP_EEBUS_SPINE/` (only `Version.cs` — empty), both `*_Tests/` are placeholders. **Note:** the csproj expects `WWCP_Core` siblings — parked in WP-W0, resolved in WP-W1, where they became submodules |
+| `libs/WWCP_EEBUS` | **Target repository of the stack** (C#, Apache-2.0, net11.0), namespace `cloud.charging.open.protocols.EEBUS.SHIP/.SPINE` | `WWCP_EEBUS_SHIP/` (SHIP messages as TryParse/ToJSON types, `PredefinedStrings/`, OCPP-like `EEBUSAdapter/`, `WebSocket/SHIPWebSocketClient/-Server.cs`, `AEEBUSNode.cs`), `WWCP_EEBUS_SPINE/` (only `Version.cs` — empty), both `*_Tests/` are placeholders. **Note:** the csproj expects `WWCP_Core` siblings — parked in WP-W0, resolved in WP-W1, where they became submodules |
 | `libs/WWCP_Core` | **WWCP core + overlay networking** (C#, Apache-2.0), the foundation `WWCP_EEBUS_Adapter` bridges onto (→ WP-W1) | `WWCP_Core/` (roaming network, charging station operator, EVSE, charging sessions), `WWCP_CoreData/`, `WWCP_OverlayNetworking/` (`AOverlayNetworkingNode`, `Reachability`, the JSON/binary request and response messages, `IWebSocketClient`/`IWebSocketServer`). `WWCP_HTTPAPI`/`WWCP_WebAPI`/`WWCP_Node` are **not** in the adapter's dependency chain, which is what keeps its Node/npm/TypeScript build steps out of our builds |
 | `libs/WWCP_POI` | **Points of interest / e-mobility identifiers** (C#, Apache-2.0), reached by `WWCP_Core` itself (→ WP-W1) | `WWCP_POI2/` is the one project in the chain: `EMobilityAccount_Id`, `RoamingNetwork_Id`, the transparency software types. Without it `WWCP_Core` does not compile — which is what an earlier attempt's 3168 errors had been about |
 
@@ -390,7 +394,7 @@ EEBUSConformanceTests/
 └── redo.sh
 ```
 
-* The csproj style follows `libs/Hermod/Hermod/Hermod.csproj` exactly: `net10.0`,
+* The csproj style follows `libs/Hermod/Hermod/Hermod.csproj` exactly: `net11.0`,
   `ImplicitUsings`, `Nullable`, `RootNamespace`/`AssemblyName` set; references as
   `ProjectReference` to Styx and Hermod. Keep the package references minimal
   (Newtonsoft.Json and BouncyCastle arrive through Hermod).
@@ -607,6 +611,13 @@ its only use of the variable was commented out — now logs.
   is the entire claim, and the 24 events it declares and never raises — 48 `CS0067`
   warnings, their raise sites still sitting commented out — are the next thing a reader
   should expect to meet.
+* **2026-11-19 — `SignaturePolicy` moved.** WWCP_Core `ba19994` (2026-11-10) dropped the
+  copy of the signature classes in `WWCP.OverlayNetworking` in favour of the ones in
+  WWCP_CoreData. The adapter had used the copy, and imports only `WWCP.OverlayNetworking`,
+  so `AEEBUSNode.cs` and `EEBUSAdapter.cs` now alias that one type from
+  `cloud.charging.open.protocols.WWCP`. Importing the whole namespace instead does not
+  work: it has a `Request_Id` of its own, which collides with the overlay one the adapter
+  means (`CS0104`).
 
 ### WP-W2 — the EEBUS-to-WWCP bridge *(L; needs a decision before any code)* ⬜ **open**
 
@@ -695,7 +706,7 @@ comment is.
 * `EEBUSConformanceTests.sln`: the projects from § 3.1 (EEBUSSimulations, EEBUSCLI,
   EEBUSConformance_Tests, EEBUSInterop_Tests) + a `ProjectReference` into the
   `libs/WWCP_EEBUS` projects.
-* `Directory.Build.props`: net10.0, LangVersion latest, Nullable, TreatWarningsAsErrors,
+* `Directory.Build.props`: net11.0, LangVersion latest, Nullable, TreatWarningsAsErrors,
   shared versions. `.gitignore`: among others `docs/specs/`.
 * GitHub Actions: `ci.yml` gates every push — submodules, `dotnet build` + `dotnet test`
   on Windows and inside a `debian:13` container (production parity, and the OpenSSL the
@@ -705,6 +716,15 @@ comment is.
   submodules' upstream default branch instead of the pins, so a breaking change in
   WWCP_EEBUS, Hermod, Styx, WWCP_Core, WWCP_POI or the Go references is reported the
   night it lands rather than at the next pin bump. All three upload their `.trx` results as artifacts.
+* **2026-11-19 — .NET 11.** Hermod, Styx, WWCP_Core and WWCP_POI moved every project to
+  `net11.0` on 2026-11-11 (Hermod `62704cc`). A `net10.0` project cannot reference a
+  `net11.0` one, so from that night no foundation pin could move until this repository
+  and WWCP_EEBUS followed: `Directory.Build.props`, the seven WWCP_EEBUS projects, and
+  `dotnet-version: '11.0.x'` in all five workflows of the two repositories. The gated
+  nightly stayed green the whole time; `upstream-drift.yml` was red from the first night
+  and opened issue #1, the first time its issue path ran on a runner. Its streak counter
+  was one too high, because `gh` reports a running run's conclusion as `""` rather than
+  `null`; fixed in the same change.
 * An `.editorconfig` modelled after the Hermod style.
 * **Acceptance:** the CI is green on both operating systems (the interoperability category
   excluded for now).
