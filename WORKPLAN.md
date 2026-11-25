@@ -105,7 +105,7 @@ Guiding principles:
 
 1. **Hermod and Styx as the foundation** (git submodules below `libs/`): WebSocket client and
    server, TLS, DNS, logging, Illias helpers. Adopt the coding conventions of Hermod and Styx.
-2. **NUnit 4.x** for all tests (like `HermodTests`).
+2. **NUnit 5.x** for all tests (like `HermodTests`).
 3. **`System.TimeProvider` everywhere** time is involved (timers, timeouts, heartbeats,
    failsafe durations, timestamps). Tests use `FakeTimeProvider`. No `DateTime.Now`, no
    `Task.Delay(...)` without a TimeProvider, no `Thread.Sleep` in tests.
@@ -398,7 +398,7 @@ EEBUSConformanceTests/
   `ImplicitUsings`, `Nullable`, `RootNamespace`/`AssemblyName` set; references as
   `ProjectReference` to Styx and Hermod. Keep the package references minimal
   (Newtonsoft.Json and BouncyCastle arrive through Hermod).
-* Tests: `NUnit` 4.6+, `NUnit3TestAdapter`, `Microsoft.NET.Test.Sdk`,
+* Tests: `NUnit` 5, `NUnit3TestAdapter`, `Microsoft.NET.Test.Sdk`,
   `Microsoft.Extensions.TimeProvider.Testing` (FakeTimeProvider).
 * **License (decided 2026-07-26):** Apache-2.0, the file header template is
   `libs/WWCP_EEBUS/WWCP_EEBUS_SHIP/Messages/ASHIPMessage.cs`
@@ -618,6 +618,11 @@ its only use of the variable was commented out — now logs.
   `cloud.charging.open.protocols.WWCP`. Importing the whole namespace instead does not
   work: it has a `Request_Id` of its own, which collides with the overlay one the adapter
   means (`CS0104`).
+* **2026-11-25 — `IIPAddress` gone.** Hermod `86b8b083` (2026-11-22) replaced the
+  interface `IIPAddress` with a single value type `IPAddress`, IPv4 or IPv6. The one place
+  the adapter named it, the `IPAddress` parameter of `SHIPWebSocketServer`'s constructor,
+  now takes `IPAddress?`, as Hermod's own servers do. That one line was the whole of the
+  upstream-drift failure from 2026-11-22 on (issue #2).
 
 ### WP-W2 — the EEBUS-to-WWCP bridge *(L; needs a decision before any code)* ⬜ **open**
 
@@ -1427,7 +1432,8 @@ handling of multiple entities (an EV appears dynamically below an EVSE and disap
 ## 7. Test strategy
 
 1. **Unit tests** (per project): the state machine transitions, serialisation, the manager
-   logic. NUnit 4 (`Assert.That`), async tests, passing a `CancellationToken` through, no
+   logic. NUnit 5 (`Assert.That`; `Assert.ThrowsAsync` returns a `Task` there and is
+   awaited), async tests, passing a `CancellationToken` through, no
    sleeping — time exclusively through `FakeTimeProvider.Advance(...)`.
 2. **Golden files:** the SHIP messages (from § 2.1 and the ship-go tests) and the SPINE
    datagrams (from the spine-go `testdata/`) byte by byte respectively structurally; our own
